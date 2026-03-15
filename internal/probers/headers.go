@@ -38,6 +38,7 @@ var headerExtraDirs = map[string]bool{
 
 func (s *HeadersDetector) Scan(projectRoot string, verbose bool) ([]*inventory.Component, error) {
 	seen := map[string]*inventory.Component{}
+	unknown := map[string]bool{}
 	fileCount := 0
 
 	WalkProject(projectRoot, headerExtraDirs, func(path string, d os.DirEntry) {
@@ -47,15 +48,13 @@ func (s *HeadersDetector) Scan(projectRoot string, verbose bool) ([]*inventory.C
 		}
 
 		fileCount++
-		extractIncludesFromFile(path, projectRoot, seen)
+		extractIncludesFromFile(path, projectRoot, seen, unknown)
 	})
 
 	if verbose {
 		fmt.Printf("  [%s] Scanned %d source/header files, found %d components\n", DetectorHeaderScan, fileCount, len(seen))
-		for _, c := range seen {
-			if strings.HasPrefix(c.PURL, "pkg:generic/") {
-				fmt.Printf("  [%s] Unknown library inferred: %q (not in catalog, using generic PURL)\n", DetectorHeaderScan, c.Name)
-			}
+		for name := range unknown {
+			fmt.Printf("  [%s] Unknown library: %q (not in catalog, skipped)\n", DetectorHeaderScan, name)
 		}
 	}
 
@@ -66,7 +65,7 @@ func (s *HeadersDetector) Scan(projectRoot string, verbose bool) ([]*inventory.C
 	return result, nil
 }
 
-func extractIncludesFromFile(path, projectRoot string, seen map[string]*inventory.Component) {
+func extractIncludesFromFile(path, projectRoot string, seen map[string]*inventory.Component, unknown map[string]bool) {
 	f, err := os.Open(path)
 	if err != nil {
 		return
@@ -97,49 +96,25 @@ func extractIncludesFromFile(path, projectRoot string, seen map[string]*inventor
 			continue
 		}
 
-		name := inferLibName(include)
-		if name == "" {
+		entry := registry.Identify(include)
+		if entry == nil {
+			unknown[include] = true
 			continue
 		}
 
-		purl := "pkg:generic/" + name
-		desc := ""
-
-		if entry := registry.Identify(include); entry != nil {
-			name = entry.Name
-			purl = entry.PURLPrefix
-			desc = entry.Description
-		}
-
-		c, ok := seen[name]
+		c, ok := seen[entry.Name]
 		if !ok {
 			c = &inventory.Component{
-				Name:            name,
+				Name:            entry.Name,
 				Version:         "unknown",
-				PURL:            purl,
+				PURL:            entry.PURLPrefix,
 				DetectionSource: string(DetectorHeaderScan),
-				Description:     desc,
+				Description:     entry.Description,
 			}
-			seen[name] = c
+			seen[entry.Name] = c
 		}
 		c.IncludePaths = slices.AppendUnique(c.IncludePaths, include)
 	}
-}
-
-// inferLibName derives a library name from the include path structure.
-// "boost/asio.hpp" → "boost", "openssl/ssl.h" → "openssl", "zlib.h" → "zlib".
-func inferLibName(include string) string {
-	if len(include) > 0 && (include[0] == '/' || include[0] == '\\') {
-		return inferLibNameFromPath(filepath.Dir(include))
-	}
-	if idx := strings.IndexByte(include, '/'); idx > 0 {
-		return strings.ToLower(include[:idx])
-	}
-	ext := filepath.Ext(include)
-	if ext != "" {
-		return strings.ToLower(strings.TrimSuffix(include, ext))
-	}
-	return strings.ToLower(include)
 }
 
 func isInternalInclude(include, sourceFile, projectRoot string) bool {

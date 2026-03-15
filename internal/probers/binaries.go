@@ -28,6 +28,7 @@ var reSoVersion = regexp.MustCompile(`\.so\.(\d+(?:\.\d+)*)`)
 
 func (s *BinariesDetector) Scan(projectRoot string, verbose bool) ([]*inventory.Component, error) {
 	seen := map[string]*inventory.Component{}
+	unknown := map[string]bool{}
 	fileCount := 0
 
 	WalkProject(projectRoot, nil, func(path string, d os.DirEntry) {
@@ -40,15 +41,13 @@ func (s *BinariesDetector) Scan(projectRoot string, verbose bool) ([]*inventory.
 		}
 
 		fileCount++
-		detectBinaryComponent(filename, seen)
+		detectBinaryComponent(filename, seen, unknown)
 	})
 
 	if verbose {
 		fmt.Printf("  [%s] Scanned %d binary artifact(s), found %d components\n", DetectorBinaryScan, fileCount, len(seen))
-		for _, c := range seen {
-			if strings.HasPrefix(c.PURL, "pkg:generic/") {
-				fmt.Printf("  [%s] Unknown library inferred: %q (not in catalog, using generic PURL)\n", DetectorBinaryScan, c.Name)
-			}
+		for name := range unknown {
+			fmt.Printf("  [%s] Unknown library: %q (not in catalog, skipped)\n", DetectorBinaryScan, name)
 		}
 	}
 
@@ -59,46 +58,34 @@ func (s *BinariesDetector) Scan(projectRoot string, verbose bool) ([]*inventory.
 	return result, nil
 }
 
-func detectBinaryComponent(filename string, seen map[string]*inventory.Component) {
+func detectBinaryComponent(filename string, seen map[string]*inventory.Component, unknown map[string]bool) {
 	name, version := parseLibraryFilename(filename)
 	if name == "" {
 		return
 	}
 
-	canonicalName := strings.ToLower(name)
-	purl := "pkg:generic/" + canonicalName
-	desc := ""
-
-	catalogMatch := false
-	if lib := registry.Identify(name); lib != nil {
-		canonicalName = lib.Name
-		purl = lib.PURLPrefix
-		desc = lib.Description
-		catalogMatch = true
-	} else if lib := registry.Identify(filename); lib != nil {
-		canonicalName = lib.Name
-		purl = lib.PURLPrefix
-		desc = lib.Description
-		catalogMatch = true
+	lib := registry.Identify(name)
+	if lib == nil {
+		lib = registry.Identify(filename)
 	}
-
-	if !catalogMatch && len(name) < 2 {
+	if lib == nil {
+		unknown[name] = true
 		return
 	}
 
-	if version != "" {
-		purl += "@" + version
-	}
-
-	key := canonicalName
+	key := lib.Name
 	c, ok := seen[key]
 	if !ok {
+		purl := lib.PURLPrefix
+		if version != "" {
+			purl += "@" + version
+		}
 		c = &inventory.Component{
-			Name:            canonicalName,
+			Name:            lib.Name,
 			Version:         version,
 			PURL:            purl,
 			DetectionSource: string(DetectorBinaryScan),
-			Description:     desc,
+			Description:     lib.Description,
 		}
 		if c.Version == "" {
 			c.Version = "unknown"
@@ -107,8 +94,7 @@ func detectBinaryComponent(filename string, seen map[string]*inventory.Component
 	} else {
 		if c.Version == "unknown" && version != "" {
 			c.Version = version
-			basePURL := strings.SplitN(c.PURL, "@", 2)[0]
-			c.PURL = basePURL + "@" + version
+			c.PURL = lib.PURLPrefix + "@" + version
 		}
 	}
 	c.LinkLibraries = slices.AppendUnique(c.LinkLibraries, filename)
