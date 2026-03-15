@@ -52,6 +52,11 @@ func (s *HeadersDetector) Scan(projectRoot string, verbose bool) ([]*inventory.C
 
 	if verbose {
 		fmt.Printf("  [%s] Scanned %d source/header files, found %d components\n", DetectorHeaderScan, fileCount, len(seen))
+		for _, c := range seen {
+			if strings.HasPrefix(c.PURL, "pkg:generic/") {
+				fmt.Printf("  [%s] Unknown library inferred: %q (not in catalog, using generic PURL)\n", DetectorHeaderScan, c.Name)
+			}
+		}
 	}
 
 	result := make([]*inventory.Component, 0, len(seen))

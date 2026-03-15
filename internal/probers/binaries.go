@@ -45,6 +45,11 @@ func (s *BinariesDetector) Scan(projectRoot string, verbose bool) ([]*inventory.
 
 	if verbose {
 		fmt.Printf("  [%s] Scanned %d binary artifact(s), found %d components\n", DetectorBinaryScan, fileCount, len(seen))
+		for _, c := range seen {
+			if strings.HasPrefix(c.PURL, "pkg:generic/") {
+				fmt.Printf("  [%s] Unknown library inferred: %q (not in catalog, using generic PURL)\n", DetectorBinaryScan, c.Name)
+			}
+		}
 	}
 
 	result := make([]*inventory.Component, 0, len(seen))
