@@ -82,6 +82,37 @@ func extractVersionFromPath(path string) string {
 	return ""
 }
 
+var skipPathSegments = map[string]bool{
+	"": true, "include": true, "lib": true, "lib64": true,
+	"usr": true, "local": true, "opt": true, "share": true,
+	"src": true, "source": true, "build": true, "out": true,
+	"bin": true, "tmp": true, "debug": true, "release": true,
+	"x86_64-linux-gnu": true, "aarch64-linux-gnu": true,
+	"i386-linux-gnu": true, "x64-windows": true, "x86-windows": true,
+	"x64-linux": true, "x64-osx": true,
+	"installed": true, "packages": true,
+	"vcpkg_installed": true, "conan": true, "data": true,
+}
+
+// inferLibNameFromPath extracts a library name from a filesystem path.
+// "/usr/local/include/boost_1_82_0" → "boost", "/opt/zlib-1.2.13/include" → "zlib".
+func inferLibNameFromPath(path string) string {
+	parts := strings.Split(filepath.ToSlash(path), "/")
+	for i := len(parts) - 1; i >= 0; i-- {
+		seg := strings.ToLower(parts[i])
+		if skipPathSegments[seg] {
+			continue
+		}
+		name := reVersionInPath.ReplaceAllString(seg, "")
+		name = strings.TrimRight(name, "-_")
+		if name == "" {
+			continue
+		}
+		return strings.ToLower(name)
+	}
+	return ""
+}
+
 var reVersionInLibName = regexp.MustCompile(`[-_](\d+)[._](\d+)(?:[._](\d+))?(?:\.lib|\.a)?$`)
 
 func extractVersionFromLibName(lib string) string {

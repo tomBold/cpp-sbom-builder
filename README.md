@@ -121,7 +121,7 @@ Tests cover each detector, the merge engine, confidence filtering, and both SBOM
 
 ## Project Structure
 
-```
+```text
 cpp-sbom-builder/
 ├── cmd/root.go                     CLI entry point (Cobra)
 ├── main.go
@@ -147,7 +147,7 @@ cpp-sbom-builder/
 │   │   ├── headers.go              Header scan detector (#include)
 │   │   ├── detector_name.go        Typed detector name constants
 │   │   └── helpers.go              Shared walk + path utilities
-│   ├── registry/db.go              Known library fingerprint catalog
+│   ├── registry/db.go              Library enrichment catalog (PURLs, descriptions)
 │   └── testutil/                   Shared test helpers
 └── output/                         Generated SBOM files
 ```
@@ -173,13 +173,13 @@ When multiple detectors find the same library, the higher-confidence source wins
 
 ### 1. False Positives — How do you tell stdlib, internal, and third-party headers apart?
 
-| Type                                             | How we filter                                                                                                                                |
-| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Stdlib** (`<vector>`, `<iostream>`)            | Deny-list of ~80 C/C++ standard header names. Never reported.                                                                                |
-| **Internal** (your own headers)                  | If the include resolves to a file inside the project root (`include/`, `src/`, `lib/`) it is skipped. Quoted `"foo.h"` includes are skipped. |
-| **Third-party** (`<boost/...>`, `<openssl/...>`) | Only angle-bracket includes matching the library fingerprint catalog are reported.                                                           |
+| Type | How we filter |
+| --- | --- |
+| **Stdlib** (`<vector>`, `<iostream>`) | Deny-list of ~80 C/C++ standard header names. Never reported. |
+| **Internal** (your own headers) | If the include resolves to a file inside the project root (`include/`, `src/`, `lib/`) it is skipped. Quoted `"foo.h"` includes are skipped. |
+| **Third-party** (`<boost/...>`, `<openssl/...>`) | Detected via **path-based inference**: the library name is derived from the include path structure (e.g. `boost/asio.hpp` -> `boost`). A built-in catalog of ~45 popular libraries optionally enriches the result with canonical names, PURLs, and descriptions -- but detection does not depend on it. |
 
-**Other inaccuracies:** Libraries not in the catalog are missed. Binary scanner only reads filenames. CMake variables like `${DEPS}` are not expanded. `compile_commands.json` may miss generated files. Commented-out lines in `conanfile.py` and `CMakeLists.txt` are stripped before parsing.
+**Other inaccuracies:** Binary scanner only reads filenames. CMake variables like `${DEPS}` are not expanded. `compile_commands.json` may miss generated files. Commented-out lines in `conanfile.py` and `CMakeLists.txt` are stripped before parsing.
 
 ### 2. Version Detection — If we only see header files, how do we get the version?
 

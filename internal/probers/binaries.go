@@ -60,27 +60,40 @@ func detectBinaryComponent(filename string, seen map[string]*inventory.Component
 		return
 	}
 
-	lib := registry.Identify(name)
-	if lib == nil {
-		lib = registry.Identify(filename)
+	canonicalName := strings.ToLower(name)
+	purl := "pkg:generic/" + canonicalName
+	desc := ""
+
+	catalogMatch := false
+	if lib := registry.Identify(name); lib != nil {
+		canonicalName = lib.Name
+		purl = lib.PURLPrefix
+		desc = lib.Description
+		catalogMatch = true
+	} else if lib := registry.Identify(filename); lib != nil {
+		canonicalName = lib.Name
+		purl = lib.PURLPrefix
+		desc = lib.Description
+		catalogMatch = true
 	}
-	if lib == nil {
+
+	if !catalogMatch && len(name) < 2 {
 		return
 	}
 
-	key := lib.Name
+	if version != "" {
+		purl += "@" + version
+	}
+
+	key := canonicalName
 	c, ok := seen[key]
 	if !ok {
-		purl := lib.PURLPrefix
-		if version != "" {
-			purl += "@" + version
-		}
 		c = &inventory.Component{
-			Name:            lib.Name,
+			Name:            canonicalName,
 			Version:         version,
 			PURL:            purl,
 			DetectionSource: string(DetectorBinaryScan),
-			Description:     lib.Description,
+			Description:     desc,
 		}
 		if c.Version == "" {
 			c.Version = "unknown"
@@ -89,7 +102,8 @@ func detectBinaryComponent(filename string, seen map[string]*inventory.Component
 	} else {
 		if c.Version == "unknown" && version != "" {
 			c.Version = version
-			c.PURL = lib.PURLPrefix + "@" + version
+			basePURL := strings.SplitN(c.PURL, "@", 2)[0]
+			c.PURL = basePURL + "@" + version
 		}
 	}
 	c.LinkLibraries = slices.AppendUnique(c.LinkLibraries, filename)
