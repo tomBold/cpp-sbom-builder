@@ -1,0 +1,20 @@
+[
+  {
+    "directory": "/home/user/project/build",
+    "command": "g++ -I/home/user/project/src -I/home/user/project/include -I/usr/local/include/boost_1_82_0 -I/usr/include/openssl -I/opt/local/include/zlib-1.2.13 -c /home/user/project/src/main.cpp -o main.o",
+    "file": "/home/user/project/src/main.cpp"
+  },
+  {
+    "directory": "/home/user/project/build",
+    "arguments": [
+      "g++",
+      "-I/home/user/project/src",
+      "-I/home/user/project/include",
+      "-I/usr/local/include/boost_1_82_0",
+      "-isystem", "/usr/include/openssl",
+      "-c", "/home/user/project/src/utils.cpp",
+      "-o", "utils.o"
+    ],
+    "file": "/home/user/project/src/utils.cpp"
+  }
+]

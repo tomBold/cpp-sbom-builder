@@ -1,0 +1,14 @@
+{
+  "name": "sample-app",
+  "version": "1.0.0",
+  "description": "Sample C++ project for cpp-sbom-builder demonstration",
+  "dependencies": [
+    "zlib",
+    "curl",
+    {
+      "name": "sqlite3",
+      "version>=": "3.43.0"
+    },
+    "yaml-cpp"
+  ]
+}

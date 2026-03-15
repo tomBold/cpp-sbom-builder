@@ -1,0 +1,22 @@
+[
+  {
+    "directory": "/tmp/sample-app/build",
+    "command": "g++ -std=c++17 -I/tmp/sample-app/include -I/tmp/sample-app/src -I/home/user/.conan/data/boost/1.82.0/_/_/package/abc123/include -I/home/user/.conan/data/openssl/3.1.4/_/_/package/def456/include -I/home/user/.conan/data/nlohmann_json/3.11.2/_/_/package/ghi789/include -I/home/user/.conan/data/spdlog/1.12.0/_/_/package/jkl012/include -I/tmp/sample-app/vcpkg_installed/x64-linux/include -c /tmp/sample-app/src/main.cpp -o main.cpp.o",
+    "file": "/tmp/sample-app/src/main.cpp"
+  },
+  {
+    "directory": "/tmp/sample-app/build",
+    "arguments": [
+      "g++",
+      "-std=c++17",
+      "-I/tmp/sample-app/include",
+      "-I/home/user/.conan/data/abseil/20230125.3/_/_/package/mno345/include",
+      "-I/home/user/.conan/data/grpc/1.54.0/_/_/package/pqr678/include",
+      "-c",
+      "/tmp/sample-app/src/http_client.cpp",
+      "-o",
+      "http_client.cpp.o"
+    ],
+    "file": "/tmp/sample-app/src/http_client.cpp"
+  }
+]

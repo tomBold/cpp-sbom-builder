@@ -1,0 +1,23 @@
+{
+  "graph_lock": {
+    "nodes": {
+      "0": {
+        "ref": "myproject/1.0",
+        "requires": ["1", "2"]
+      },
+      "1": {
+        "ref": "boost/1.82.0#rev001",
+        "requires": ["3"]
+      },
+      "2": {
+        "ref": "openssl/3.1.4@conan/stable#rev002",
+        "requires": ["3"]
+      },
+      "3": {
+        "ref": "zlib/1.2.13#rev003",
+        "requires": []
+      }
+    }
+  },
+  "version": "0.4"
+}
