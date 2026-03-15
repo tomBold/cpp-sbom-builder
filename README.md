@@ -147,7 +147,9 @@ cpp-sbom-builder/
 │   │   ├── headers.go              Header scan detector (#include)
 │   │   ├── detector_name.go        Typed detector name constants
 │   │   └── helpers.go              Shared walk + path utilities
-│   ├── registry/db.go              Known library fingerprint catalog
+│   ├── pathutil/safepath.go         Path validation (IsUnderRoot, RejectPath)
+│   ├── registry/db.go              Known library catalog + indexed Identify()
+│   ├── slices/slices.go            AppendUnique helper
 │   └── testutil/                   Shared test helpers
 └── output/                         Generated SBOM files
 ```
