@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -77,6 +78,10 @@ func Execute() {
 }
 
 func runScan(cmd *cobra.Command, args []string) error {
+	if flagMinConfidence < 0 || flagMinConfidence > 1 {
+		return fmt.Errorf("--min-confidence must be between 0.0 and 1.0, got %g", flagMinConfidence)
+	}
+
 	absDir, err := filepath.Abs(flagDir)
 	if err != nil {
 		return fmt.Errorf("cannot resolve directory %q: %w", flagDir, err)
@@ -115,12 +120,14 @@ func runScan(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	flagFormat = strings.ToLower(strings.TrimSpace(flagFormat))
+
 	outputPath := flagOutput
 	if outputPath == "" {
 		if err := os.MkdirAll("output", 0o755); err != nil {
 			return fmt.Errorf("cannot create output directory: %w", err)
 		}
-		ts := time.Now().Format("2006-01-02_15-04-05")
+		ts := fmt.Sprintf("%d", time.Now().UnixMilli())
 		switch flagFormat {
 		case "spdx":
 			outputPath = filepath.Join("output", fmt.Sprintf("sbom-spdx-%s.json", ts))
