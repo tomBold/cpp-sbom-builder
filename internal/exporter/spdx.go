@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/tomBold/cpp-sbom-builder/internal/collector"
-	"github.com/tomBold/cpp-sbom-builder/internal/inventory"
 )
 
 type spdxDoc struct {
@@ -68,13 +67,7 @@ func WriteSPDX(result *collector.ScanResult, outputPath, toolVersion string, min
 }
 
 func buildSPDX(result *collector.ScanResult, toolVersion string, minConfidence float64) spdxDoc {
-	sorted := make([]*inventory.Component, 0, len(result.Components))
-	for _, c := range result.Components {
-		if minConfidence > 0 && collector.SourceConfidence(c.DetectionSource) < minConfidence {
-			continue
-		}
-		sorted = append(sorted, c)
-	}
+	sorted := collector.FilterByConfidence(result.Components, minConfidence)
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Name < sorted[j].Name })
 
 	pkgs := make([]spdxPackage, 0, len(sorted))

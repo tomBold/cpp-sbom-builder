@@ -1,5 +1,7 @@
 package collector
 
+import "github.com/tomBold/cpp-sbom-builder/internal/inventory"
+
 // sourceInfo describes a single detector's position in the
 // source-priority model.  All per-detector policy lives here;
 // add new detectors by extending sourceRegistry.
@@ -39,4 +41,21 @@ func SourceConfidence(name string) float64 {
 
 func isDirectDetector(name string) bool {
 	return sourceRegistry[name].IsDirect
+}
+
+// FilterByConfidence returns components whose detection source meets the
+// minimum confidence threshold. A threshold of 0 disables filtering.
+func FilterByConfidence(components []*inventory.Component, minConfidence float64) []*inventory.Component {
+	if minConfidence <= 0 {
+		out := make([]*inventory.Component, len(components))
+		copy(out, components)
+		return out
+	}
+	var out []*inventory.Component
+	for _, c := range components {
+		if SourceConfidence(c.DetectionSource) >= minConfidence {
+			out = append(out, c)
+		}
+	}
+	return out
 }

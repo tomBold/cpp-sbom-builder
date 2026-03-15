@@ -79,13 +79,7 @@ func WriteCycloneDX(result *collector.ScanResult, outputPath, toolVersion string
 }
 
 func buildCycloneDX(result *collector.ScanResult, toolVersion string, minConfidence float64) cdxBOM {
-	sorted := make([]*inventory.Component, 0, len(result.Components))
-	for _, c := range result.Components {
-		if minConfidence > 0 && collector.SourceConfidence(c.DetectionSource) < minConfidence {
-			continue
-		}
-		sorted = append(sorted, c)
-	}
+	sorted := collector.FilterByConfidence(result.Components, minConfidence)
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Name < sorted[j].Name })
 
 	bomRefByName := map[string]string{}
