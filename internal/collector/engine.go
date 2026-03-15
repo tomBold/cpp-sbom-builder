@@ -38,7 +38,7 @@ func (e *Engine) Scan() (*ScanResult, error) {
 	probers.ScanVersionHints(allComponents, e.ProjectRoot)
 
 	e.attachEdges(allComponents, outputs.conanGraph)
-	e.markDirectTransitive(allComponents, outputs.conanGraph)
+	e.markDirectTransitive(allComponents, outputs.conanGraph, outputs.outputs)
 
 	tree := inventory.BuildDependencyTree(allComponents)
 
@@ -150,21 +150,20 @@ func (e *Engine) attachEdges(components []*inventory.Component, conanGraph *prob
 	}
 }
 
-func (e *Engine) markDirectTransitive(components []*inventory.Component, conanGraph *probers.ConanScanResult) {
+func (e *Engine) markDirectTransitive(components []*inventory.Component, conanGraph *probers.ConanScanResult, outputs []detectorOutput) {
 	directNames := make(map[string]bool)
 	for name := range conanGraph.DirectNames {
 		directNames[dedupKey(name)] = true
 	}
 
-	for _, det := range []Detector{
-		&probers.VcpkgDetector{},
-		&probers.CMakeDetector{},
-		&probers.CompileCommandsDetector{},
-		&probers.HeadersDetector{},
-	} {
-		comps, _ := det.Scan(e.ProjectRoot, false)
-		for _, c := range comps {
-			directNames[dedupKey(c.Name)] = true
+	directDetectors := map[string]bool{
+		"vcpkg": true, "cmake": true, "compile_commands.json": true, "header-scan": true,
+	}
+	for _, o := range outputs {
+		if directDetectors[o.name] {
+			for _, c := range o.components {
+				directNames[dedupKey(c.Name)] = true
+			}
 		}
 	}
 
