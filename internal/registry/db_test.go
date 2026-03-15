@@ -35,6 +35,43 @@ func TestIdentify_Unknown(t *testing.T) {
 	}
 }
 
+func TestIdentify_NoFalsePositiveOnSubstring(t *testing.T) {
+	falseInputs := []string{
+		"reformatter",
+		"resultvalue",
+		"missile",
+		"eventbridge",
+		"formula",
+	}
+	for _, input := range falseInputs {
+		if got := Identify(input); got != nil {
+			t.Errorf("Identify(%q) = %q, want nil (false positive)", input, got.Name)
+		}
+	}
+}
+
+func TestIdentify_WordBoundaryStillMatches(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"lib/fmt/core.h", "fmt"},
+		{"/opt/openssl/lib/libssl.so", "openssl"},
+		{"libuv-1.44", "libuv"},
+		{"third_party/zlib/zlib.h", "zlib"},
+	}
+	for _, tt := range tests {
+		got := Identify(tt.input)
+		if got == nil {
+			t.Errorf("Identify(%q) = nil, want %q", tt.input, tt.want)
+			continue
+		}
+		if got.Name != tt.want {
+			t.Errorf("Identify(%q).Name = %q, want %q", tt.input, got.Name, tt.want)
+		}
+	}
+}
+
 func TestIsSystemHeader_Stdlib(t *testing.T) {
 	stdlib := []string{"vector", "iostream", "string", "algorithm", "memory", "cstdint"}
 	for _, h := range stdlib {

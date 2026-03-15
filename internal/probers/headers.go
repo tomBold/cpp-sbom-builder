@@ -6,7 +6,9 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
+	"sync"
 
 	"github.com/tomBold/cpp-sbom-builder/internal/inventory"
 	"github.com/tomBold/cpp-sbom-builder/internal/pathutil"
@@ -36,20 +38,69 @@ var headerExtraDirs = map[string]bool{
 	"bazel-bin": true, "bazel-out": true, "bazel-testlogs": true,
 }
 
+type headerLocal struct {
+	seen    map[string]*inventory.Component
+	unknown map[string]bool
+	count   int
+}
+
 func (s *HeadersDetector) Scan(projectRoot string, verbose bool) ([]*inventory.Component, error) {
-	seen := map[string]*inventory.Component{}
-	unknown := map[string]bool{}
-	fileCount := 0
+	numWorkers := runtime.NumCPU()
+	if numWorkers < 2 {
+		numWorkers = 2
+	}
+
+	fileCh := make(chan string, numWorkers*4)
+	locals := make([]headerLocal, numWorkers)
+
+	var statMu sync.RWMutex
+	statCache := map[string]bool{}
+
+	var wg sync.WaitGroup
+	for i := 0; i < numWorkers; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			l := headerLocal{
+				seen:    map[string]*inventory.Component{},
+				unknown: map[string]bool{},
+			}
+			for path := range fileCh {
+				l.count++
+				extractIncludesFromFile(path, projectRoot, l.seen, l.unknown, statCache, &statMu)
+			}
+			locals[idx] = l
+		}(i)
+	}
 
 	WalkProject(projectRoot, headerExtraDirs, func(path string, d os.DirEntry) {
 		ext := strings.ToLower(filepath.Ext(d.Name()))
 		if !sourceExts[ext] {
 			return
 		}
-
-		fileCount++
-		extractIncludesFromFile(path, projectRoot, seen, unknown)
+		fileCh <- path
 	})
+	close(fileCh)
+	wg.Wait()
+
+	seen := map[string]*inventory.Component{}
+	unknown := map[string]bool{}
+	fileCount := 0
+	for _, l := range locals {
+		fileCount += l.count
+		for k := range l.unknown {
+			unknown[k] = true
+		}
+		for name, c := range l.seen {
+			if existing, ok := seen[name]; ok {
+				for _, p := range c.IncludePaths {
+					existing.IncludePaths = slices.AppendUnique(existing.IncludePaths, p)
+				}
+			} else {
+				seen[name] = c
+			}
+		}
+	}
 
 	if verbose {
 		fmt.Printf("  [%s] Scanned %d source/header files, found %d components\n", DetectorHeaderScan, fileCount, len(seen))
@@ -65,7 +116,7 @@ func (s *HeadersDetector) Scan(projectRoot string, verbose bool) ([]*inventory.C
 	return result, nil
 }
 
-func extractIncludesFromFile(path, projectRoot string, seen map[string]*inventory.Component, unknown map[string]bool) {
+func extractIncludesFromFile(path, projectRoot string, seen map[string]*inventory.Component, unknown map[string]bool, statCache map[string]bool, statMu *sync.RWMutex) {
 	f, err := os.Open(path)
 	if err != nil {
 		return
@@ -92,7 +143,7 @@ func extractIncludesFromFile(path, projectRoot string, seen map[string]*inventor
 			continue
 		}
 
-		if isInternalInclude(include, path, projectRoot) {
+		if isInternalInclude(include, path, projectRoot, statCache, statMu) {
 			continue
 		}
 
@@ -117,7 +168,7 @@ func extractIncludesFromFile(path, projectRoot string, seen map[string]*inventor
 	}
 }
 
-func isInternalInclude(include, sourceFile, projectRoot string) bool {
+func isInternalInclude(include, sourceFile, projectRoot string, statCache map[string]bool, statMu *sync.RWMutex) bool {
 	sourceDir := filepath.Dir(sourceFile)
 	candidates := []string{
 		filepath.Join(sourceDir, include),
@@ -130,7 +181,20 @@ func isInternalInclude(include, sourceFile, projectRoot string) bool {
 		if !pathutil.IsUnderRoot(candidate, projectRoot) {
 			continue
 		}
-		if _, err := os.Stat(candidate); err == nil {
+		statMu.RLock()
+		exists, cached := statCache[candidate]
+		statMu.RUnlock()
+		if cached {
+			if exists {
+				return true
+			}
+			continue
+		}
+		_, err := os.Stat(candidate)
+		statMu.Lock()
+		statCache[candidate] = err == nil
+		statMu.Unlock()
+		if err == nil {
 			return true
 		}
 	}

@@ -26,6 +26,8 @@ var reStaticLibName = regexp.MustCompile(`^lib([A-Za-z0-9_\-]+?)(?:[-_](\d+\.\d+
 
 var reSoVersion = regexp.MustCompile(`\.so\.(\d+(?:\.\d+)*)`)
 
+var reDLLVersion = regexp.MustCompile(`^([A-Za-z0-9_\-]+?)[-_](\d+\.\d+(?:\.\d+)?)$`)
+
 func (s *BinariesDetector) Scan(projectRoot string, verbose bool) ([]*inventory.Component, error) {
 	seen := map[string]*inventory.Component{}
 	unknown := map[string]bool{}
@@ -124,8 +126,7 @@ func parseLibraryFilename(filename string) (name, version string) {
 
 	if strings.HasSuffix(lower, ".dll") || strings.HasSuffix(lower, ".lib") {
 		base := lower[:strings.LastIndex(lower, ".")]
-		reVer := regexp.MustCompile(`^([A-Za-z0-9_\-]+?)[-_](\d+\.\d+(?:\.\d+)?)$`)
-		if m := reVer.FindStringSubmatch(base); m != nil {
+		if m := reDLLVersion.FindStringSubmatch(base); m != nil {
 			return m[1], m[2]
 		}
 		return base, ""

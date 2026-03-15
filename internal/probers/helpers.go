@@ -13,6 +13,11 @@ import (
 var SkipDirs = map[string]bool{
 	"node_modules": true,
 	"vendor":       true,
+	"build":        true,
+	"_build":       true,
+	"out":          true,
+	".cache":       true,
+	"__pycache__":  true,
 }
 
 // WalkProject walks root, skipping directories whose names start with
@@ -26,7 +31,7 @@ func WalkProject(root string, extraSkip map[string]bool, visitFile func(path str
 		}
 		if d.IsDir() {
 			name := d.Name()
-			if strings.HasPrefix(name, ".") || strings.HasPrefix(name, ".git") ||
+			if strings.HasPrefix(name, ".") ||
 				SkipDirs[name] || extraSkip[name] {
 				return filepath.SkipDir
 			}

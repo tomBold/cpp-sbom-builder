@@ -335,7 +335,43 @@ var Catalog = []KnownLib{
 	},
 }
 
-var systemHeaders = buildSystemHeaderSet()
+var (
+	systemHeaders = buildSystemHeaderSet()
+	hintIndex     = buildHintIndex()
+)
+
+// hintEntry stores a pre-lowered hint and a pointer to its catalog entry.
+type hintEntry struct {
+	hint  string
+	entry *KnownLib
+}
+
+// hintIdx provides O(1) lookups for single-segment path hints and a
+// short slice for multi-segment hints / include patterns that need
+// substring matching.
+type hintIdx struct {
+	exact      map[string]*KnownLib // single-segment PathHints → entry
+	substrPats []hintEntry          // multi-segment PathHints + IncludePats
+}
+
+func buildHintIndex() hintIdx {
+	idx := hintIdx{exact: make(map[string]*KnownLib, len(Catalog)*2)}
+	for i := range Catalog {
+		entry := &Catalog[i]
+		for _, hint := range entry.PathHints {
+			lh := strings.ToLower(hint)
+			if strings.Contains(lh, "/") {
+				idx.substrPats = append(idx.substrPats, hintEntry{lh, entry})
+			} else {
+				idx.exact[lh] = entry
+			}
+		}
+		for _, pat := range entry.IncludePats {
+			idx.substrPats = append(idx.substrPats, hintEntry{strings.ToLower(pat), entry})
+		}
+	}
+	return idx
+}
 
 func buildSystemHeaderSet() map[string]struct{} {
 	raw := []string{
@@ -382,18 +418,29 @@ func IsSystemHeader(include string) bool {
 
 func Identify(s string) *KnownLib {
 	lower := strings.ToLower(s)
-	for i := range Catalog {
-		entry := &Catalog[i]
-		for _, hint := range entry.PathHints {
-			if strings.Contains(lower, strings.ToLower(hint)) {
-				return entry
-			}
-		}
-		for _, pat := range entry.IncludePats {
-			if strings.Contains(lower, strings.ToLower(pat)) {
-				return entry
-			}
+
+	// Fast path: extract segments and do O(1) map lookups against
+	// single-segment path hints (covers ~90% of catalog entries).
+	for _, seg := range splitSegments(lower) {
+		if entry, ok := hintIndex.exact[seg]; ok {
+			return entry
 		}
 	}
+
+	// Slow path: substring matching for multi-segment hints and
+	// include patterns (e.g. "google/protobuf", "openssl/").
+	for _, he := range hintIndex.substrPats {
+		if strings.Contains(lower, he.hint) {
+			return he.entry
+		}
+	}
+
 	return nil
 }
+
+func splitSegments(s string) []string {
+	return strings.FieldsFunc(s, func(r rune) bool {
+		return r == '/' || r == '\\' || r == '-' || r == '_' || r == '.'
+	})
+}
+

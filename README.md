@@ -191,8 +191,14 @@ The first match wins.
 
 ### 3. Performance — 10 GB monorepo: regex, string search, or AST?
 
-**We use regex and string search, not an AST.**
+**We use regex and string search, not an AST.** We only need `#include` lines, not full C++ semantics — pattern matching is fast and sufficient.
 
-- We only need `#include` lines, not full C++ semantics. Pattern matching is fast and sufficient.
-- We skip `.git`, `build`, `vendor`, `node_modules` directories. All 6 detectors run in parallel. Manifest detectors only read a few small files.
-- A 10 GB monorepo with ~500k source files should finish in seconds. Use `--min-confidence 0.80` to skip the header scan if it's slow.
+- All 6 detectors run in parallel via goroutines. Manifest detectors (Conan, vcpkg, CMake) only read a few small files.
+- The header scanner fans out file processing to `runtime.NumCPU()` workers via a channel. Each worker builds local results that are merged after the walk, so there is no lock contention on the hot path.
+- `isInternalInclude` caches `os.Stat` results across all files with a `sync.RWMutex`, avoiding thousands of redundant syscalls when many files include the same headers.
+- `registry.Identify` uses a pre-built map for O(1) lookups on single-segment hints (~90% of the catalog). Only multi-segment patterns fall back to substring matching.
+- All regexes are compiled once at package init, never inside loops.
+- We skip `.git`, `build`, `out`, `_build`, `vendor`, `node_modules`, `.cache`, and `__pycache__` directories.
+- A 10 GB monorepo with ~500k source files should finish in seconds. Use `--min-confidence 0.80` to skip the header scan entirely if needed.
+
+At true production scale, two architectural changes would help further: (1) a single shared `filepath.WalkDir` dispatching entries to all detectors via channels instead of ~6 independent walks, which requires changing the `Detector` interface; and (2) streaming JSON output via `json.Encoder` to reduce peak memory for extremely large SBOMs.
