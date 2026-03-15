@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/tomBold/cpp-sbom-builder/internal/testutil"
@@ -86,7 +87,7 @@ func TestConanfilePy_RevisionInSelfRequires(t *testing.T) {
 	result := strat.ScanWithGraph(testutil.TestdataDir(), false)
 	for _, c := range result.Components {
 		if c.Name == "openssl" && c.Revision == "deadbeef1234" {
-			return // found with correct revision
+			return
 		}
 	}
 	t.Error("no openssl component with revision=deadbeef1234 from conanfile.py")
@@ -158,7 +159,7 @@ func TestConanRef_PlaceholderChannel(t *testing.T) {
 	if c == nil {
 		t.Fatal("returned nil")
 	}
-	if containsStr(c.PURL, "_/_") || containsStr(c.PURL, "?channel=") {
+	if strings.Contains(c.PURL, "_/_") || strings.Contains(c.PURL, "?channel=") {
 		t.Errorf("PURL %q should not contain placeholder channel", c.PURL)
 	}
 }
@@ -411,18 +412,6 @@ func keys(m map[string]bool) []string {
 		result = append(result, k)
 	}
 	return result
-}
-
-func containsStr(s, sub string) bool {
-	if len(sub) == 0 {
-		return true
-	}
-	for i := 0; i <= len(s)-len(sub); i++ {
-		if s[i:i+len(sub)] == sub {
-			return true
-		}
-	}
-	return false
 }
 
 func assertEdge(t *testing.T, edges map[string][]string, parent, child string) {

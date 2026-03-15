@@ -121,7 +121,7 @@ Tests cover each detector, the merge engine, confidence filtering, and both SBOM
 
 ## Project Structure
 
-```
+```text
 cpp-sbom-builder/
 ├── cmd/root.go                     CLI entry point (Cobra)
 ├── main.go
@@ -179,7 +179,7 @@ When multiple detectors find the same library, the higher-confidence source wins
 | **Internal** (your own headers)                  | If the include resolves to a file inside the project root (`include/`, `src/`, `lib/`) it is skipped. Quoted `"foo.h"` includes are skipped. |
 | **Third-party** (`<boost/...>`, `<openssl/...>`) | Only angle-bracket includes matching the library fingerprint catalog are reported.                                                           |
 
-**Other inaccuracies:** Libraries not in the catalog are missed. Binary scanner only reads filenames. CMake variables like `${DEPS}` are not expanded. `compile_commands.json` may miss generated files. Commented-out lines in `conanfile.py` and `CMakeLists.txt` are stripped before parsing.
+**Other inaccuracies:** Libraries not in the catalog are skipped but logged in `--verbose` mode so you can investigate. Binary scanner only reads filenames. CMake variables like `${DEPS}` are not expanded. `compile_commands.json` may miss generated files. Commented-out lines in `conanfile.py` and `CMakeLists.txt` are stripped before parsing.
 
 ### 2. Version Detection — If we only see header files, how do we get the version?
 
