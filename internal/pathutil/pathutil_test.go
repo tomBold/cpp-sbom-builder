@@ -52,4 +52,3 @@ func TestRejectPath(t *testing.T) {
 		}
 	}
 }
-

@@ -94,7 +94,7 @@ func TestCycloneDX_MinConfidenceFilter(t *testing.T) {
 func TestCycloneDX_SourceConfidence(t *testing.T) {
 	sources := []string{"conan", "vcpkg", "compile_commands.json", "cmake", "binary-scan", "header-scan", "unknown"}
 	for _, src := range sources {
-		c := SourceConfidence(src)
+		c := collector.SourceConfidence(src)
 		if c < 0 || c > 1 {
 			t.Errorf("SourceConfidence(%q) = %f, must be in [0,1]", src, c)
 		}

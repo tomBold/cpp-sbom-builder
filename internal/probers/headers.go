@@ -25,8 +25,8 @@ var (
 
 var sourceExts = map[string]bool{
 	".cpp": true, ".cc": true, ".cxx": true, ".c++": true,
-	".c":   true,
-	".h":   true, ".hpp": true, ".hxx": true, ".h++": true, ".hh": true,
+	".c": true,
+	".h": true, ".hpp": true, ".hxx": true, ".h++": true, ".hh": true,
 	".inl": true, ".ipp": true, ".tpp": true,
 }
 

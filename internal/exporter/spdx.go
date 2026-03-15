@@ -13,16 +13,17 @@ import (
 )
 
 type spdxDoc struct {
-	SPDXVersion   string         `json:"spdxVersion"`
-	DataLicense   string         `json:"dataLicense"`
-	SPDXID        string         `json:"SPDXID"`
-	Name          string         `json:"name"`
-	CreationInfo  spdxCreation   `json:"creationInfo"`
-	Packages      []spdxPackage  `json:"packages"`
+	SPDXVersion       string        `json:"spdxVersion"`
+	DataLicense       string        `json:"dataLicense"`
+	SPDXID            string        `json:"SPDXID"`
+	Name              string        `json:"name"`
+	DocumentNamespace string        `json:"documentNamespace"`
+	CreationInfo      spdxCreation  `json:"creationInfo"`
+	Packages          []spdxPackage `json:"packages"`
 }
 
 type spdxCreation struct {
-	Created string   `json:"created"`
+	Created  string   `json:"created"`
 	Creators []string `json:"creators"`
 }
 
@@ -30,6 +31,7 @@ type spdxPackage struct {
 	SPDXID           string            `json:"SPDXID"`
 	Name             string            `json:"name"`
 	VersionInfo      string            `json:"versionInfo,omitempty"`
+	FilesAnalyzed    bool              `json:"filesAnalyzed"`
 	DownloadLocation string            `json:"downloadLocation"`
 	ExternalRefs     []spdxExternalRef `json:"externalRefs,omitempty"`
 }
@@ -62,7 +64,7 @@ func WriteSPDX(result *collector.ScanResult, outputPath, toolVersion string, min
 func buildSPDX(result *collector.ScanResult, toolVersion string, minConfidence float64) spdxDoc {
 	sorted := make([]*inventory.Component, 0, len(result.Components))
 	for _, c := range result.Components {
-		if minConfidence > 0 && SourceConfidence(c.DetectionSource) < minConfidence {
+		if minConfidence > 0 && collector.SourceConfidence(c.DetectionSource) < minConfidence {
 			continue
 		}
 		sorted = append(sorted, c)
@@ -75,6 +77,7 @@ func buildSPDX(result *collector.ScanResult, toolVersion string, minConfidence f
 			SPDXID:           fmt.Sprintf("SPDXRef-pkg-%d", i+1),
 			Name:             c.Name,
 			VersionInfo:      c.Version,
+			FilesAnalyzed:    false,
 			DownloadLocation: "NOASSERTION",
 		}
 		if c.Version == "" || c.Version == "unknown" {
@@ -90,11 +93,14 @@ func buildSPDX(result *collector.ScanResult, toolVersion string, minConfidence f
 		pkgs = append(pkgs, pkg)
 	}
 
+	docName := "cpp-sbom-builder-" + strings.ReplaceAll(toolVersion, ".", "-")
+
 	return spdxDoc{
-		SPDXVersion:  "SPDX-2.3",
-		DataLicense:  "CC0-1.0",
-		SPDXID:       "SPDXRef-DOCUMENT",
-		Name:         "cpp-sbom-builder-" + strings.ReplaceAll(toolVersion, ".", "-"),
+		SPDXVersion:       "SPDX-2.3",
+		DataLicense:       "CC0-1.0",
+		SPDXID:            "SPDXRef-DOCUMENT",
+		Name:              docName,
+		DocumentNamespace: fmt.Sprintf("https://spdx.org/spdxdocs/%s-%s", docName, generateURN()),
 		CreationInfo: spdxCreation{
 			Created:  time.Now().UTC().Format(time.RFC3339),
 			Creators: []string{"Tool: cpp-sbom-builder-" + toolVersion},

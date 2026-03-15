@@ -18,7 +18,6 @@ type ConanDetector struct{}
 
 func (s *ConanDetector) Name() string { return "conan" }
 
-
 type conanLockV1 struct {
 	GraphLock struct {
 		Nodes map[string]conanLockV1Node `json:"nodes"`

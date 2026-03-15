@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tomBold/cpp-sbom-builder/internal/inventory"
 	"github.com/tomBold/cpp-sbom-builder/internal/collector"
+	"github.com/tomBold/cpp-sbom-builder/internal/inventory"
 )
 
 type cdxBOM struct {
@@ -75,7 +75,7 @@ func WriteCycloneDX(result *collector.ScanResult, outputPath, toolVersion string
 func buildCycloneDX(result *collector.ScanResult, toolVersion string, minConfidence float64) cdxBOM {
 	sorted := make([]*inventory.Component, 0, len(result.Components))
 	for _, c := range result.Components {
-		if minConfidence > 0 && SourceConfidence(c.DetectionSource) < minConfidence {
+		if minConfidence > 0 && collector.SourceConfidence(c.DetectionSource) < minConfidence {
 			continue
 		}
 		sorted = append(sorted, c)
@@ -137,7 +137,7 @@ func buildCycloneDX(result *collector.ScanResult, toolVersion string, minConfide
 func componentProperties(c *inventory.Component) []cdxProperty {
 	props := []cdxProperty{
 		{Name: "cpp-sbom-builder:detectionSource", Value: c.DetectionSource},
-		{Name: "cpp-sbom-builder:confidence", Value: fmt.Sprintf("%.2f", SourceConfidence(c.DetectionSource))},
+		{Name: "cpp-sbom-builder:confidence", Value: fmt.Sprintf("%.2f", collector.SourceConfidence(c.DetectionSource))},
 		{Name: "cpp-sbom-builder:dependencyType", Value: c.DependencyType()},
 	}
 	if c.Revision != "" {
@@ -159,23 +159,6 @@ func componentProperties(c *inventory.Component) []cdxProperty {
 		})
 	}
 	return props
-}
-
-func SourceConfidence(source string) float64 {
-	switch source {
-	case "conan", "vcpkg":
-		return 0.97
-	case "compile_commands.json":
-		return 0.85
-	case "cmake":
-		return 0.80
-	case "binary-scan":
-		return 0.65
-	case "header-scan":
-		return 0.60
-	default:
-		return 0.50
-	}
 }
 
 func versionOrEmpty(v string) string {

@@ -57,8 +57,8 @@ type detectorOutput struct {
 }
 
 type runResult struct {
-	outputs     []detectorOutput
-	conanGraph  *probers.ConanScanResult
+	outputs    []detectorOutput
+	conanGraph *probers.ConanScanResult
 }
 
 func (e *Engine) runDetectors() runResult {
@@ -116,9 +116,9 @@ func (e *Engine) foldOutputs(r runResult) (components []*inventory.Component, fi
 	ordered := make([]detectorOutput, len(r.outputs))
 	copy(ordered, r.outputs)
 	sort.Slice(ordered, func(i, j int) bool {
-		ti, tj := trustLevel(ordered[i].name), trustLevel(ordered[j].name)
-		if ti != tj {
-			return ti > tj
+		ri, rj := sourceRank(ordered[i].name), sourceRank(ordered[j].name)
+		if ri != rj {
+			return ri > rj
 		}
 		return ordered[i].name < ordered[j].name
 	})
@@ -169,11 +169,8 @@ func (e *Engine) markDirectTransitive(components []*inventory.Component, conanGr
 		directNames[inventory.NormalizeKey(name)] = true
 	}
 
-	directDetectors := map[string]bool{
-		"vcpkg": true, "cmake": true, "compile_commands.json": true, "header-scan": true,
-	}
 	for _, o := range outputs {
-		if directDetectors[o.name] {
+		if isDirectDetector(o.name) {
 			for _, c := range o.components {
 				directNames[inventory.NormalizeKey(c.Name)] = true
 			}
@@ -208,7 +205,6 @@ type mergeRule func(existing, incoming *inventory.Component)
 
 var foldRules = []mergeRule{
 	preferKnownVersion,
-	preferHigherTrust,
 	preferDescription,
 	accumulatePaths,
 	preferRevisionChannel,
@@ -234,12 +230,6 @@ func preferKnownVersion(existing, incoming *inventory.Component) {
 	}
 }
 
-func preferHigherTrust(existing, incoming *inventory.Component) {
-	if trustLevel(incoming.DetectionSource) > trustLevel(existing.DetectionSource) {
-		existing.DetectionSource = incoming.DetectionSource
-	}
-}
-
 func preferDescription(existing, incoming *inventory.Component) {
 	if existing.Description == "" && incoming.Description != "" {
 		existing.Description = incoming.Description
@@ -261,22 +251,5 @@ func preferRevisionChannel(existing, incoming *inventory.Component) {
 	}
 	if existing.Channel == "" && incoming.Channel != "" {
 		existing.Channel = incoming.Channel
-	}
-}
-
-func trustLevel(source string) int {
-	switch source {
-	case "conan", "vcpkg":
-		return 10
-	case "compile_commands.json":
-		return 8
-	case "cmake":
-		return 6
-	case "binary-scan":
-		return 4
-	case "header-scan":
-		return 1
-	default:
-		return 0
 	}
 }
