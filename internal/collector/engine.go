@@ -2,11 +2,11 @@ package collector
 
 import (
 	"fmt"
-	"strings"
 	"sync"
 
 	"github.com/tomBold/cpp-sbom-builder/internal/inventory"
 	"github.com/tomBold/cpp-sbom-builder/internal/probers"
+	"github.com/tomBold/cpp-sbom-builder/internal/slices"
 )
 
 type Detector interface {
@@ -134,17 +134,17 @@ func (e *Engine) foldOutputs(r runResult) (byName map[string]*inventory.Componen
 func (e *Engine) attachEdges(components []*inventory.Component, conanGraph *probers.ConanScanResult) {
 	edges := make(map[string][]string)
 	for parent, children := range conanGraph.Edges {
-		pk := dedupKey(parent)
+		pk := inventory.NormalizeKey(parent)
 		for _, child := range children {
-			edges[pk] = appendUniq(edges[pk], child)
+			edges[pk] = slices.AppendUnique(edges[pk], child)
 		}
 	}
 
 	for _, c := range components {
-		key := dedupKey(c.Name)
+		key := inventory.NormalizeKey(c.Name)
 		if children, ok := edges[key]; ok {
 			for _, child := range children {
-				c.Dependencies = appendUniq(c.Dependencies, child)
+				c.Dependencies = slices.AppendUnique(c.Dependencies, child)
 			}
 		}
 	}
@@ -153,7 +153,7 @@ func (e *Engine) attachEdges(components []*inventory.Component, conanGraph *prob
 func (e *Engine) markDirectTransitive(components []*inventory.Component, conanGraph *probers.ConanScanResult, outputs []detectorOutput) {
 	directNames := make(map[string]bool)
 	for name := range conanGraph.DirectNames {
-		directNames[dedupKey(name)] = true
+		directNames[inventory.NormalizeKey(name)] = true
 	}
 
 	directDetectors := map[string]bool{
@@ -162,7 +162,7 @@ func (e *Engine) markDirectTransitive(components []*inventory.Component, conanGr
 	for _, o := range outputs {
 		if directDetectors[o.name] {
 			for _, c := range o.components {
-				directNames[dedupKey(c.Name)] = true
+				directNames[inventory.NormalizeKey(c.Name)] = true
 			}
 		}
 	}
@@ -170,12 +170,12 @@ func (e *Engine) markDirectTransitive(components []*inventory.Component, conanGr
 	referencedAsChild := make(map[string]bool)
 	for _, c := range components {
 		for _, childName := range c.Dependencies {
-			referencedAsChild[dedupKey(childName)] = true
+			referencedAsChild[inventory.NormalizeKey(childName)] = true
 		}
 	}
 
 	for _, c := range components {
-		key := dedupKey(c.Name)
+		key := inventory.NormalizeKey(c.Name)
 		c.IsDirect = directNames[key] || !referencedAsChild[key]
 	}
 }
@@ -186,13 +186,6 @@ func sliceFromMap(byName map[string]*inventory.Component) []*inventory.Component
 		out = append(out, c)
 	}
 	return out
-}
-
-func dedupKey(name string) string {
-	name = strings.ToLower(name)
-	name = strings.ReplaceAll(name, "_", "-")
-	name = strings.ReplaceAll(name, ".", "-")
-	return name
 }
 
 type mergeRule func(existing, incoming *inventory.Component)
@@ -206,7 +199,7 @@ var foldRules = []mergeRule{
 }
 
 func foldInto(byName map[string]*inventory.Component, incoming *inventory.Component) {
-	key := dedupKey(incoming.Name)
+	key := inventory.NormalizeKey(incoming.Name)
 	existing, ok := byName[key]
 	if !ok {
 		byName[key] = incoming
@@ -239,10 +232,10 @@ func preferDescription(existing, incoming *inventory.Component) {
 
 func accumulatePaths(existing, incoming *inventory.Component) {
 	for _, p := range incoming.IncludePaths {
-		existing.IncludePaths = appendUniq(existing.IncludePaths, p)
+		existing.IncludePaths = slices.AppendUnique(existing.IncludePaths, p)
 	}
 	for _, l := range incoming.LinkLibraries {
-		existing.LinkLibraries = appendUniq(existing.LinkLibraries, l)
+		existing.LinkLibraries = slices.AppendUnique(existing.LinkLibraries, l)
 	}
 }
 
@@ -270,13 +263,4 @@ func trustLevel(source string) int {
 	default:
 		return 0
 	}
-}
-
-func appendUniq(slice []string, s string) []string {
-	for _, v := range slice {
-		if v == s {
-			return slice
-		}
-	}
-	return append(slice, s)
 }

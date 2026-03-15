@@ -11,6 +11,7 @@ import (
 
 	"github.com/tomBold/cpp-sbom-builder/internal/inventory"
 	"github.com/tomBold/cpp-sbom-builder/internal/registry"
+	"github.com/tomBold/cpp-sbom-builder/internal/slices"
 )
 
 type ConanDetector struct{}
@@ -141,17 +142,17 @@ func parseConanLockWithGraph(path string) *lockGraphResult {
 			if parentName == "" {
 				continue
 			}
-			for _, reqIdx := range node.Requires {
-				reqIdx = strings.SplitN(reqIdx, "#", 2)[0]
-				childName := nodeNames[reqIdx]
+			for _, req := range node.Requires {
+				reqBase := strings.SplitN(req, "#", 2)[0]
+				childName := nodeNames[reqBase]
 				if childName != "" && childName != parentName {
-					result.Edges[parentName] = appendUnique(result.Edges[parentName], childName)
+					result.Edges[parentName] = slices.AppendUnique(result.Edges[parentName], childName)
 				}
 			}
 			if idx == "0" {
-				for _, reqIdx := range node.Requires {
-					reqIdx = strings.SplitN(reqIdx, "#", 2)[0]
-					if childName := nodeNames[reqIdx]; childName != "" {
+				for _, req := range node.Requires {
+					reqBase := strings.SplitN(req, "#", 2)[0]
+					if childName := nodeNames[reqBase]; childName != "" {
 						result.DirectNames[childName] = true
 					}
 				}

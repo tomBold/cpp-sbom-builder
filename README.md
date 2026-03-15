@@ -9,7 +9,7 @@ A **Software Bill of Materials (SBOM) generation engine** for C++ projects. Scan
 ```text
 ┌─────────────────────────────────────────────────────────────────┐
 │  YOU                                                             │
-│  Run: cpp-sbom-builder scan --dir ./my-project --output sbom.json│
+│  Run: cpp-sbom-builder scan --dir ./my-project --output sbom-cyclonedx.json│
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -39,7 +39,7 @@ A **Software Bill of Materials (SBOM) generation engine** for C++ projects. Scan
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │  STEP 3: Output                                                  │
-│  sbom.json — CycloneDX 1.5 JSON with components[] and            │
+│  sbom-cyclonedx.json — CycloneDX 1.5 JSON with components[] and   │
 │  dependencies[] (name, version, purl, detectionSource, etc.)     │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -58,15 +58,15 @@ cd cpp-sbom-builder
 **Option A — run without building:**
 
 ```bash
-go run . scan --dir ./demo --output sbom.json --verbose
+go run . scan --dir ./demo --output sbom-cyclonedx.json --verbose
 ```
 
 **Option B — build then run:**
 
 ```bash
 go build -o cpp-sbom-builder .
-./cpp-sbom-builder scan --dir ./demo --output sbom.json --verbose   # Linux/macOS
-.\cpp-sbom-builder.exe scan --dir .\demo --output sbom.json --verbose   # Windows
+./cpp-sbom-builder scan --dir ./demo --output sbom-cyclonedx.json --verbose   # Linux/macOS
+.\cpp-sbom-builder.exe scan --dir .\demo --output sbom-cyclonedx.json --verbose   # Windows
 ```
 
 **Need:** Go 1.22+. No compiler, CMake, or Conan required.
@@ -78,7 +78,7 @@ go build -o cpp-sbom-builder .
 The `demo/` folder is a fake C++ project that triggers every detector:
 
 ```bash
-go run . scan --dir ./demo --output sbom.json --verbose --show-strategies
+go run . scan --dir ./demo --output sbom-cyclonedx.json --verbose --show-strategies
 ```
 
 (Or `.\cpp-sbom-builder.exe scan ...` on Windows after building.)
@@ -88,7 +88,7 @@ go run . scan --dir ./demo --output sbom.json --verbose --show-strategies
 Point at your project root (after build, so `compile_commands.json` exists if you use CMake):
 
 ```bash
-go run . scan --dir /path/to/your/project --output sbom.json
+go run . scan --dir /path/to/your/project --output sbom-cyclonedx.json
 ```
 
 **Flags:** `--dir` (folder to scan), `--output` (file or `-` for stdout), `--format` (`cyclonedx` or `spdx`), `--verbose`, `--show-strategies`, `--min-confidence` (0–1).
@@ -110,17 +110,17 @@ go run . scan --dir /path/to/your/project --output sbom.json
 
 ## Output Format
 
-Default output: `sbom.json` (CycloneDX). Use `--output` to change path; use `-` for stdout.
+Default output: `sbom-cyclonedx.json` (CycloneDX) or `sbom-spdx.json` (SPDX). Use `--output` to change path; use `-` for stdout.
 
 | Format | Flag | Typical output file |
 | --- | --- | --- |
-| **CycloneDX 1.5** | `--format cyclonedx` (default) | `sbom.json` |
+| **CycloneDX 1.5** | `--format cyclonedx` (default) | `sbom-cyclonedx.json` |
 | **SPDX 2.3** | `--format spdx` | `sbom-spdx.json` |
 
 ```bash
-go run . scan --dir ./demo --output sbom.json                    # CycloneDX (default)
-go run . scan --dir ./demo --output sbom-spdx.json --format spdx  # SPDX
-go run . scan --dir ./demo --output -                             # JSON to stdout
+go run . scan --dir ./demo                    # CycloneDX → sbom-cyclonedx.json
+go run . scan --dir ./demo --format spdx     # SPDX → sbom-spdx.json
+go run . scan --dir ./demo --output -        # JSON to stdout
 ```
 
 ---

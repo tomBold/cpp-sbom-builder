@@ -26,5 +26,6 @@ go.work.sum
 
 # Generated SBOM output
 sbom.json
+sbom-cyclonedx.json
 sbom-spdx.json
 output/

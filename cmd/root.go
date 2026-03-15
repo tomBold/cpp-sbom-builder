@@ -43,18 +43,19 @@ var scanCmd = &cobra.Command{
 	Use:   "scan",
 	Short: "Scan a C++ project and generate an SBOM",
 	Long: `Scan a C++ project directory for third-party dependencies and produce
-a CycloneDX 1.5 JSON SBOM.
+a CycloneDX 1.5 or SPDX 2.3 JSON SBOM (default: sbom-cyclonedx.json or sbom-spdx.json).
 
 Examples:
-  cpp-sbom-builder scan --dir /path/to/project --output sbom.json
+  cpp-sbom-builder scan --dir /path/to/project
+  cpp-sbom-builder scan --dir /path/to/project --format spdx
   cpp-sbom-builder scan --dir . --output - --verbose
-  cpp-sbom-builder scan --dir /path/to/project --output sbom.json --show-strategies`,
+  cpp-sbom-builder scan --dir /path/to/project --show-strategies`,
 	RunE: runScan,
 }
 
 func init() {
 	scanCmd.Flags().StringVarP(&flagDir, "dir", "d", ".", "Path to the C++ project root directory")
-	scanCmd.Flags().StringVarP(&flagOutput, "output", "o", "sbom.json", "Output file path (use '-' for stdout)")
+	scanCmd.Flags().StringVarP(&flagOutput, "output", "o", "sbom-cyclonedx.json", "Output file path (use '-' for stdout)")
 	scanCmd.Flags().StringVarP(&flagFormat, "format", "f", "cyclonedx", "Output format: cyclonedx, spdx")
 	scanCmd.Flags().BoolVarP(&flagVerbose, "verbose", "v", false, "Enable verbose output")
 	scanCmd.Flags().BoolVar(&flagShowStrategies, "show-strategies", false, "Print which strategies fired after scanning")
@@ -110,13 +111,18 @@ func runScan(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	outputPath := flagOutput
+	if flagOutput != "-" && flagFormat == "spdx" && flagOutput == "sbom-cyclonedx.json" {
+		outputPath = "sbom-spdx.json"
+	}
+
 	switch flagFormat {
 	case "cyclonedx", "cdx":
-		if err := exporter.WriteCycloneDX(result, flagOutput, toolVersion, flagMinConfidence); err != nil {
+		if err := exporter.WriteCycloneDX(result, outputPath, toolVersion, flagMinConfidence); err != nil {
 			return fmt.Errorf("failed to write CycloneDX output: %w", err)
 		}
 	case "spdx":
-		if err := exporter.WriteSPDX(result, flagOutput, toolVersion, flagMinConfidence); err != nil {
+		if err := exporter.WriteSPDX(result, outputPath, toolVersion, flagMinConfidence); err != nil {
 			return fmt.Errorf("failed to write SPDX output: %w", err)
 		}
 	default:
@@ -124,7 +130,7 @@ func runScan(cmd *cobra.Command, args []string) error {
 	}
 
 	if flagOutput != "-" {
-		fmt.Fprintf(statusOut, "SBOM written to: %s\n", flagOutput)
+		fmt.Fprintf(statusOut, "SBOM written to: %s\n", outputPath)
 	}
 
 	return nil

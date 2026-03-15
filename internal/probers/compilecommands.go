@@ -9,7 +9,9 @@ import (
 	"strings"
 
 	"github.com/tomBold/cpp-sbom-builder/internal/inventory"
+	"github.com/tomBold/cpp-sbom-builder/internal/pathutil"
 	"github.com/tomBold/cpp-sbom-builder/internal/registry"
+	"github.com/tomBold/cpp-sbom-builder/internal/slices"
 )
 
 type CompileCommandsDetector struct{}
@@ -102,6 +104,9 @@ func (s *CompileCommandsDetector) Scan(projectRoot string, verbose bool) ([]*inv
 			for _, m := range reIncPath.FindAllStringSubmatch(cmdStr, -1) {
 				if len(m) > 1 {
 					incPath := strings.TrimSpace(m[1])
+					if pathutil.RejectPath(incPath) {
+						continue
+					}
 					if isExternalPath(incPath, projectRoot) {
 						externalIncludes[filepath.ToSlash(incPath)] = true
 					}
@@ -124,12 +129,14 @@ func (s *CompileCommandsDetector) Scan(projectRoot string, verbose bool) ([]*inv
 				arg = strings.TrimSpace(arg)
 				switch {
 				case strings.HasPrefix(arg, "-I") && len(arg) > 2:
-					if isExternalPath(arg[2:], projectRoot) {
-						externalIncludes[filepath.ToSlash(arg[2:])] = true
+					incPath := arg[2:]
+					if !pathutil.RejectPath(incPath) && isExternalPath(incPath, projectRoot) {
+						externalIncludes[filepath.ToSlash(incPath)] = true
 					}
 				case strings.HasPrefix(arg, "/I") && len(arg) > 2:
-					if isExternalPath(arg[2:], projectRoot) {
-						externalIncludes[filepath.ToSlash(arg[2:])] = true
+					incPath := arg[2:]
+					if !pathutil.RejectPath(incPath) && isExternalPath(incPath, projectRoot) {
+						externalIncludes[filepath.ToSlash(incPath)] = true
 					}
 				case strings.HasPrefix(arg, "-l") && len(arg) > 2:
 					externalLibs[arg[2:]] = true
@@ -157,14 +164,14 @@ func resolveComponents(includes map[string]bool, libs map[string]bool, source st
 			seen[lib.Name] = c
 		}
 		if incPath != "" {
-			c.IncludePaths = appendUnique(c.IncludePaths, incPath)
+			c.IncludePaths = slices.AppendUnique(c.IncludePaths, incPath)
 			if v := extractVersionFromPath(incPath); v != "" && c.Version == "unknown" {
 				c.Version = v
 				c.PURL = lib.PURLPrefix + "@" + v
 			}
 		}
 		if linkLib != "" {
-			c.LinkLibraries = appendUnique(c.LinkLibraries, linkLib)
+			c.LinkLibraries = slices.AppendUnique(c.LinkLibraries, linkLib)
 			if v := extractVersionFromLibName(linkLib); v != "" && c.Version == "unknown" {
 				c.Version = v
 				c.PURL = lib.PURLPrefix + "@" + v

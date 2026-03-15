@@ -9,7 +9,9 @@ import (
 	"strings"
 
 	"github.com/tomBold/cpp-sbom-builder/internal/inventory"
+	"github.com/tomBold/cpp-sbom-builder/internal/pathutil"
 	"github.com/tomBold/cpp-sbom-builder/internal/registry"
+	"github.com/tomBold/cpp-sbom-builder/internal/slices"
 )
 
 type HeadersDetector struct{}
@@ -119,7 +121,7 @@ func extractIncludesFromFile(path, projectRoot string, seen map[string]*inventor
 			}
 			seen[entry.Name] = c
 		}
-		c.IncludePaths = appendUnique(c.IncludePaths, include)
+		c.IncludePaths = slices.AppendUnique(c.IncludePaths, include)
 	}
 }
 
@@ -133,15 +135,11 @@ func isInternalInclude(include, sourceFile, projectRoot string) bool {
 		filepath.Join(projectRoot, "lib", include),
 	}
 	for _, candidate := range candidates {
+		if !pathutil.IsUnderRoot(candidate, projectRoot) {
+			continue
+		}
 		if _, err := os.Stat(candidate); err == nil {
-			abs, _ := filepath.Abs(candidate)
-			absRoot, _ := filepath.Abs(projectRoot)
-			if strings.HasPrefix(
-				filepath.ToSlash(strings.ToLower(abs)),
-				filepath.ToSlash(strings.ToLower(absRoot)),
-			) {
-				return true
-			}
+			return true
 		}
 	}
 	return false
@@ -153,7 +151,15 @@ func ScanVersionHints(components []*inventory.Component, projectRoot string) {
 			continue
 		}
 		for _, incPath := range c.IncludePaths {
-			v := findVersionInDir(incPath)
+			resolved := incPath
+			if !filepath.IsAbs(incPath) {
+				resolved = filepath.Join(projectRoot, incPath)
+			}
+			abs, err := filepath.Abs(resolved)
+			if err != nil || pathutil.RejectPath(abs) || !pathutil.IsUnderRoot(abs, projectRoot) {
+				continue
+			}
+			v := findVersionInDir(abs, projectRoot)
 			if v != "" {
 				c.Version = v
 				if strings.Contains(c.PURL, "@") {
@@ -168,35 +174,51 @@ func ScanVersionHints(components []*inventory.Component, projectRoot string) {
 	}
 }
 
-func findVersionInDir(path string) string {
+func findVersionInDir(path, projectRoot string) string {
+	if pathutil.RejectPath(path) || !pathutil.IsUnderRoot(path, projectRoot) {
+		return ""
+	}
 	info, err := os.Stat(path)
 	if err != nil {
 		return ""
 	}
 	if !info.IsDir() {
-		return findVersionInFile(path)
+		return findVersionInFile(path, projectRoot)
 	}
 
 	for _, vf := range []string{"version.h", "version.hpp", "Version.h", "config.h", "config.hpp"} {
-		if v := findVersionInFile(filepath.Join(path, vf)); v != "" {
-			return v
+		p := filepath.Join(path, vf)
+		if pathutil.IsUnderRoot(p, projectRoot) {
+			if v := findVersionInFile(p, projectRoot); v != "" {
+				return v
+			}
 		}
 	}
 
+	var foundVersion string
 	_ = filepath.WalkDir(path, func(p string, d os.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
 			return nil
 		}
+		if !pathutil.IsUnderRoot(p, projectRoot) {
+			return nil
+		}
 		lname := strings.ToLower(d.Name())
 		if strings.Contains(lname, "version") || strings.Contains(lname, "config") {
-			findVersionInFile(p)
+			if v := findVersionInFile(p, projectRoot); v != "" {
+				foundVersion = v
+				return filepath.SkipAll
+			}
 		}
 		return nil
 	})
-	return ""
+	return foundVersion
 }
 
-func findVersionInFile(path string) string {
+func findVersionInFile(path, projectRoot string) string {
+	if pathutil.RejectPath(path) || !pathutil.IsUnderRoot(path, projectRoot) {
+		return ""
+	}
 	f, err := os.Open(path)
 	if err != nil {
 		return ""

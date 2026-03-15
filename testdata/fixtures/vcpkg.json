@@ -1,0 +1,13 @@
+{
+  "name": "test-project",
+  "version": "1.0.0",
+  "dependencies": [
+    "zlib",
+    "curl",
+    {
+      "name": "sqlite3",
+      "version": "3.43.0"
+    },
+    "yaml-cpp"
+  ]
+}

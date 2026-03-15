@@ -10,6 +10,7 @@ import (
 
 	"github.com/tomBold/cpp-sbom-builder/internal/inventory"
 	"github.com/tomBold/cpp-sbom-builder/internal/registry"
+	"github.com/tomBold/cpp-sbom-builder/internal/slices"
 )
 
 type CMakeDetector struct{}
@@ -216,9 +217,9 @@ func upsertComponent(seen map[string]*inventory.Component, lib *registry.KnownLi
 		seen[lib.Name] = c
 	}
 	if incPath != "" {
-		c.IncludePaths = appendUnique(c.IncludePaths, incPath)
+		c.IncludePaths = slices.AppendUnique(c.IncludePaths, incPath)
 	}
 	if linkLib != "" {
-		c.LinkLibraries = appendUnique(c.LinkLibraries, linkLib)
+		c.LinkLibraries = slices.AppendUnique(c.LinkLibraries, linkLib)
 	}
 }

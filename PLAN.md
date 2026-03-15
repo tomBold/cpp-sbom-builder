@@ -1,152 +1,278 @@
-# cpp-sbom-builder — Architecture Plan
+# Fix Plan: Code Review Findings
 
-## Problem Statement
-
-C++ has no universal package manager. A project may use Conan, vcpkg, CMake FetchContent, hand-vendored headers, or any combination of these. An SBOM engine must handle all of them.
-
-The tool scans a project **after build** (so compiler artifacts are available) and produces a component inventory in CycloneDX 1.5 JSON.
+Plan to address all issues from the code review. Ordered by priority.
 
 ---
 
-## Architecture Overview
+## Phase 1: Security (Critical)
 
-```
-main.go
-  └─ cmd/root.go          (cobra CLI: scan command + flags)
-        └─ scanner.Scan()  (orchestrator)
-              ├─ ConanStrategy         → conan.lock, conanfile.txt, conanfile.py
-              ├─ VcpkgStrategy         → vcpkg.json, vcpkg-lock.json, status
-              ├─ CMakeStrategy         → CMakeCache.txt, CMakeLists.txt
-              ├─ CompileCommandsStrategy → compile_commands.json
-              ├─ BinariesStrategy      → *.so, *.a, *.dll, *.lib, *.dylib
-              └─ HeadersStrategy       → *.cpp, *.h, *.hpp, ...
-                    ↓ all run concurrently ↓
-              merge + normalize + deduplicate
-                    ↓
-              ScanVersionHints()       (post-process: fill in unknown versions)
-              BuildDependencyTree()    (mark direct vs transitive)
-                    ↓
-              output.WriteCycloneDX() → sbom.json
-```
+### 1.1 Path validation helper
 
----
+**Goal:** Add a shared helper to validate that paths stay under project root.
 
-## Key Data Structures
+**Location:** `internal/probers/helpers.go` (or new `internal/pathutil/pathutil.go`)
 
+**Implementation:**
 ```go
-// model.Component — the canonical representation of a detected dependency
-type Component struct {
-    Name            string   // Canonical library name (e.g. "boost")
-    Version         string   // Detected version or "unknown"
-    PURL            string   // Package URL (pkg:conan/boost@1.82.0)
-    Revision        string   // Conan recipe revision hash
-    Channel         string   // Conan user/channel
-    DetectionSource string   // Winning strategy name
-    Description     string   // From fingerprint DB
-    IncludePaths    []string // External include paths that matched
-    LinkLibraries   []string // Linked library names
-    IsDirect        bool     // Direct vs transitive
-    Dependencies    []string // Child dependency names (from conan.lock graph)
+// IsUnderRoot returns true if path (after Clean) is under root.
+// Both paths should be absolute. Returns false for "/", empty, or invalid.
+func IsUnderRoot(path, root string) bool {
+    clean := filepath.Clean(path)
+    abs, err := filepath.Abs(clean)
+    if err != nil {
+        return false
+    }
+    absRoot, err := filepath.Abs(root)
+    if err != nil {
+        return false
+    }
+    if abs == "/" || abs == "" || absRoot == "" {
+        return false
+    }
+    rel, err := filepath.Rel(absRoot, abs)
+    if err != nil {
+        return false
+    }
+    return !strings.HasPrefix(rel, "..") && rel != ".."
+}
+```
+
+**Files to create/update:**
+- Add `internal/pathutil/pathutil.go` with `IsUnderRoot`
+- Add `internal/pathutil/pathutil_test.go` with edge-case tests
+
+---
+
+### 1.2 Validate include paths in `findVersionInDir` / `findVersionInFile`
+
+**Goal:** Never walk or read outside project root.
+
+**Location:** `internal/probers/headers.go`
+
+**Changes:**
+- Add `projectRoot string` parameter to `findVersionInDir` and `findVersionInFile` (or pass a context struct)
+- Before `os.Stat(path)` or `filepath.WalkDir(path, ...)`, call `pathutil.IsUnderRoot(path, projectRoot)`
+- Reject paths like `/`, `/etc`, or any path outside project
+- Update `ScanVersionHints` to pass `projectRoot`; update callers of `findVersionInDir` (currently called with `incPath` from `c.IncludePaths`)
+
+**Note:** `ScanVersionHints` receives `projectRoot`. The include paths in `c.IncludePaths` can be absolute (from `-I`) or relative. Resolve them against project root and validate before calling `findVersionInDir`.
+
+---
+
+### 1.3 Fix `isInternalInclude` path validation
+
+**Goal:** Validate candidates before `os.Stat` and ensure they stay under project root.
+
+**Location:** `internal/probers/headers.go:126-147`
+
+**Changes:**
+- For each `candidate`, resolve to absolute path
+- Call `pathutil.IsUnderRoot(candidate, projectRoot)` before `os.Stat`
+- Skip candidates that escape root
+
+---
+
+### 1.4 Validate include paths in `compilecommands.go`
+
+**Goal:** Only add include paths to components if they are under project root (or a whitelisted system path).
+
+**Location:** `internal/probers/compilecommands.go` (around lines 155-170)
+
+**Changes:**
+- Before adding `incPath` to `c.IncludePaths`, resolve and validate with `pathutil.IsUnderRoot`
+- Skip paths that escape root (e.g. `-I /`, `-I /usr/include` is system – may allow or reject per policy)
+
+---
+
+## Phase 2: Bug Fix
+
+### 2.1 Fix `findVersionInDir` – return value in WalkDir
+
+**Goal:** Use the result of `findVersionInFile` when walking subdirectories.
+
+**Location:** `internal/probers/headers.go:186-195`
+
+**Change:**
+```go
+_ = filepath.WalkDir(path, func(p string, d os.DirEntry, err error) error {
+    if err != nil || d.IsDir() {
+        return nil
+    }
+    lname := strings.ToLower(d.Name())
+    if strings.Contains(lname, "version") || strings.Contains(lname, "config") {
+        if v := findVersionInFile(p); v != "" {
+            // Cannot return from WalkDir callback; use a variable
+            // Store in outer scope or use sync.Once / named return
+            return filepath.SkipAll  // after setting a result
+        }
+    }
+    return nil
+})
+```
+
+**Better approach:** Use a variable to capture the result and `filepath.SkipAll` to stop the walk:
+```go
+var foundVersion string
+_ = filepath.WalkDir(path, func(p string, d os.DirEntry, err error) error {
+    if err != nil || d.IsDir() {
+        return nil
+    }
+    lname := strings.ToLower(d.Name())
+    if strings.Contains(lname, "version") || strings.Contains(lname, "config") {
+        if v := findVersionInFile(p); v != "" {
+            foundVersion = v
+            return filepath.SkipAll
+        }
+    }
+    return nil
+})
+if foundVersion != "" {
+    return foundVersion
 }
 ```
 
 ---
 
-## Detection Strategy Design
+## Phase 3: Refactoring
 
-### Why Multiple Strategies?
+### 3.1 Unify `appendUnique` / `appendUniq`
 
-C++ projects have no single authoritative source of truth:
-- A project using Conan + vcpkg simultaneously is common
-- `compile_commands.json` reveals what the compiler actually compiled against (ground truth, but requires a build)
-- Header scanning catches dependencies not declared in any manifest (vendored, git-submodule, system-installed)
+**Goal:** Single implementation, used everywhere.
 
-Each strategy provides a different signal; their combination maximises recall with controlled precision.
+**Options:**
+- **A:** Add `internal/slices/slices.go` with `AppendUnique(slice []string, s string) []string`
+- **B:** Keep in `internal/probers/helpers.go` and have collector import probers (creates dependency)
+- **C:** Add to `internal/inventory` or a neutral `internal/util` package
 
-### Confidence Model
+**Recommended:** Option A – `internal/slices/appendunique.go`
 
-Each strategy is assigned a confidence score:
-
-| Strategy | Confidence | Rationale |
-|---|---|---|
-| conan / vcpkg | 0.97 | Authoritative manifest — exact names and versions |
-| compile_commands.json | 0.85 | Compiler-level truth — what was actually compiled against |
-| cmake | 0.80 | Build system declaration — correct but not always versioned |
-| binary-scan | 0.65 | Filename inference — could match internal libs |
-| header-scan | 0.60 | Heuristic — filtered but inherently approximate |
-
-When multiple strategies detect the same library, the higher-confidence source's version wins. All evidence (include paths, link libraries) is accumulated.
-
-### Normalization and Deduplication
-
-Libraries from different strategies may have different names:
-- Conan: `nlohmann_json`, vcpkg: `nlohmann-json`, fingerprint: `nlohmann-json`
-- Conan: `openssl`, CMake: `OpenSSL`, header: `openssl`
-
-The scanner normalizes names with `normalizeKey()` (lowercase, `_`/`.` → `-`) before merging. Strategies that match a known fingerprint use the canonical fingerprint name.
+**Files to update:**
+- Create `internal/slices/appendunique.go`
+- Replace `appendUnique` in: `helpers.go`, `binaries.go`, `headers.go`, `compilecommands.go`, `cmake.go`, `conan.go`
+- Replace `appendUniq` in: `engine.go`
+- Remove `appendUnique` from `helpers.go`, `appendUniq` from `engine.go`
 
 ---
 
-## Version Resolution
+### 3.2 Unify `dedupKey` / `NormalizeKey` (optional)
 
-Version is set by the first strategy (by confidence rank) that provides one:
+**Goal:** Use one function for name normalization.
 
-1. **Conan / vcpkg manifest** — authoritative version string
-2. **CMake FetchContent GIT_TAG** — version tag from CMakeLists.txt
-3. **compile_commands.json path** — extracted from include path (e.g. `boost_1_82_0` → `1.82.0`)
-4. **Binary filename** — `libssl.so.3.1.4` → `3.1.4`
-5. **Header version macro** — `#define BOOST_LIB_VERSION "1_82"` scanned post-detection
+**Location:** `engine.go:191-196`, `component.go:31-36`
+
+**Change:** Remove `dedupKey` from collector, use `inventory.NormalizeKey` everywhere. Collector already imports inventory.
 
 ---
 
-## Dependency Tree
+## Phase 4: Testing
 
-The `conan.lock` v1 graph format contains explicit direct/transitive edges (node 0 = project root, edges list direct requirements). These are used to build the `dependencies[]` section of the CycloneDX output.
+### 4.1 Unit tests for exporters
 
-Without a conan.lock graph, all detected components are marked as direct (conservative). A full dependency tree reconstruction from CMake or vcpkg would require running those tools, which is out of scope for this MVP.
+**Goal:** Test CycloneDX and SPDX exporters with synthetic `ScanResult`, not `demo/`.
 
----
+**Location:** `internal/exporter/cyclonedx_test.go`, `spdx_test.go`
 
-## False Positive Mitigation
-
-1. **Stdlib deny-list**: ~80 C/C++ standard library headers are filtered before fingerprint matching
-2. **Internal header resolution**: include paths that resolve to a file inside the project root are skipped
-3. **Fingerprint-gated matching**: unknown includes (not in the fingerprint DB) are silently dropped rather than creating low-quality entries
-4. **Confidence threshold**: `--min-confidence 0.80` skips header-scan and binary-scan results
+**Implementation:**
+- Add helper `syntheticScanResult() *collector.ScanResult` that builds a minimal result (2–3 components, some deps)
+- Add tests: `TestCycloneDX_WithSyntheticResult`, `TestSPDX_WithSyntheticResult`
+- Keep existing integration tests that use `demo/` as optional or behind a build tag
 
 ---
 
-## Performance Design
+### 4.2 Tests for deptree, BinariesDetector, path helpers
 
-- **Streaming I/O**: `bufio.Scanner` line-by-line reads; no full-file buffering except for JSON manifests
-- **Compiled regexes**: all patterns are compiled once at startup (`regexp.MustCompile` at package level)
-- **Directory skipping**: `.git`, `node_modules`, `CMakeFiles`, `build`, `out`, `_build`, `bazel-*`, `vendor`, `third_party` are skipped entirely
-- **Concurrent strategies**: all strategies run in parallel goroutines; I/O wait time is hidden behind concurrency
-- **No AST parsing**: string-based matching is 10–100× faster than C++ AST parsing for this use case
-
----
-
-## What the MVP Intentionally Omits
-
-| Feature | Rationale for deferral |
-|---|---|
-| ELF SONAME parsing | Requires binary parsing; filename inference covers most cases |
-| pkg-config (.pc files) | Niche; most projects using pkg-config also have CMake |
-| Meson support | Low market share vs. CMake+Conan; addable as a new Strategy |
-| SPDX output | CycloneDX is more widely adopted for SCA use cases |
-| Vulnerability lookup | Not required by the assignment |
-| Windows PE/MSVC .pdb analysis | Complex; MSVC users typically have vcpkg or CMake manifests |
+**Files to add/update:**
+- `internal/inventory/deptree_test.go`: `TestBuildDependencyTree`, `TestBuildDependencyTree_Cycle`
+- `internal/probers/detectors_test.go`: `TestBinariesDetector_Scan` (or `TestBinaries_Scan`)
+- `internal/pathutil/pathutil_test.go`: `TestIsUnderRoot` with cases: under root, `..`, `/`, empty, Windows paths if needed
 
 ---
 
-## Sample Project Design
+## Phase 5: Performance
 
-`sample/` is **intentionally synthetic**. It includes:
-- `conanfile.txt` — Conan manifest (boost, openssl, nlohmann-json, spdlog)
-- `vcpkg.json` — vcpkg manifest (zlib, libcurl, sqlite3, yaml-cpp)
-- `CMakeLists.txt` — CMake declarations (fmt via FetchContent, openssl/boost via find_package)
-- `compile_commands.json` — pre-generated compiler DB (abseil, grpc via external -I paths)
-- `src/main.cpp`, `src/http_client.cpp` — source with third-party `#include` directives
-- `build/libssl.so.3.1.4`, `build/libz.so.1.2.13` — binary stubs for artifact detection
+### 5.1 Guard `findVersionInDir` against dangerous paths
 
-This gives the reviewer a deterministic, reproducible demonstration of all six strategies without requiring a real C++ toolchain.
+**Goal:** Avoid walking entire filesystem when path is `/` or similar.
+
+**Location:** `internal/probers/headers.go`
+
+**Changes:** (Overlaps with Phase 1.2)
+- Reject if `path == "/"` or `path == ""`
+- Reject if path is not under project root
+- Optionally limit walk depth (e.g. max 3 levels) to avoid huge trees
+
+---
+
+## Phase 6: Style & Maintainability
+
+### 6.1 Fix `conan.go` variable shadowing
+
+**Location:** `internal/probers/conan.go:152-153`
+
+**Change:**
+```go
+for _, req := range node.Requires {
+    reqBase := strings.SplitN(req, "#", 2)[0]
+    if childName := nodeNames[reqBase]; childName != "" {
+        result.DirectNames[childName] = true
+    }
+}
+```
+
+---
+
+### 6.2 Logger interface (optional, lower priority)
+
+**Goal:** Replace `fmt.Printf` with a logger for testability.
+
+**Implementation:** Add `type Logger interface { Printf(format string, args ...any) }` and pass it to detectors. Default implementation writes to `os.Stdout`; tests can use a no-op or buffer.
+
+---
+
+## Phase 7: CI
+
+### 7.1 GitHub Actions
+
+**Goal:** Run tests and build on push/PR.
+
+**File:** `.github/workflows/ci.yml`
+
+```yaml
+name: CI
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - run: go build ./...
+      - run: go test ./...
+```
+
+---
+
+## Execution Order
+
+| Step | Phase | Task | Est. effort |
+|------|-------|------|-------------|
+| 1 | 1.1 | Add `pathutil.IsUnderRoot` + tests | Small |
+| 2 | 1.2–1.4 | Apply path validation in headers, compilecommands | Medium |
+| 3 | 2.1 | Fix `findVersionInDir` bug | Small |
+| 4 | 3.1 | Unify appendUnique/appendUniq | Small |
+| 5 | 3.2 | Use NormalizeKey in collector | Trivial |
+| 6 | 4.1–4.2 | Add missing tests | Medium |
+| 7 | 5.1 | Guard findVersionInDir (covered by 1.2) | — |
+| 8 | 6.1 | Fix conan.go shadowing | Trivial |
+| 9 | 7.1 | Add GitHub Actions | Small |
+
+---
+
+## Dependencies Between Tasks
+
+- Phase 1.1 must be done before 1.2, 1.3, 1.4
+- Phase 2.1 can be done in parallel with Phase 1 (after 1.1)
+- Phase 3.1 is independent
+- Phase 4 can start after Phase 2 (bug fix) so tests validate correct behavior

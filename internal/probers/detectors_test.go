@@ -282,6 +282,54 @@ func TestExtractVersionFromPath(t *testing.T) {
 	}
 }
 
+func TestVcpkg_ManifestDetectsDependencies(t *testing.T) {
+	strat := &VcpkgDetector{}
+	comps, err := strat.Scan(testdataDir(), false)
+	if err != nil {
+		t.Fatalf("Scan failed: %v", err)
+	}
+	byName := nameSet(comps)
+	for _, want := range []string{"zlib", "libcurl", "sqlite3", "yaml-cpp"} {
+		if !byName[want] {
+			t.Errorf("vcpkg: expected %q not found; got %v", want, keys(byName))
+		}
+	}
+}
+
+func TestVcpkg_DetectionSource(t *testing.T) {
+	strat := &VcpkgDetector{}
+	comps, _ := strat.Scan(testdataDir(), false)
+	for _, c := range comps {
+		if c.DetectionSource != "vcpkg" {
+			t.Errorf("%q has DetectionSource=%q, want vcpkg", c.Name, c.DetectionSource)
+		}
+	}
+}
+
+func TestCMake_FindPackageAndFetchContent(t *testing.T) {
+	strat := &CMakeDetector{}
+	comps, err := strat.Scan(testdataDir(), false)
+	if err != nil {
+		t.Fatalf("Scan failed: %v", err)
+	}
+	byName := nameSet(comps)
+	for _, want := range []string{"openssl", "boost", "fmt"} {
+		if !byName[want] {
+			t.Errorf("cmake: expected %q not found; got %v", want, keys(byName))
+		}
+	}
+}
+
+func TestCMake_DetectionSource(t *testing.T) {
+	strat := &CMakeDetector{}
+	comps, _ := strat.Scan(testdataDir(), false)
+	for _, c := range comps {
+		if c.DetectionSource != "cmake" {
+			t.Errorf("%q has DetectionSource=%q, want cmake", c.Name, c.DetectionSource)
+		}
+	}
+}
+
 func TestParseLibraryFilename(t *testing.T) {
 	cases := []struct {
 		filename string

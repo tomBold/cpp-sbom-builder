@@ -9,6 +9,7 @@ import (
 
 	"github.com/tomBold/cpp-sbom-builder/internal/inventory"
 	"github.com/tomBold/cpp-sbom-builder/internal/registry"
+	"github.com/tomBold/cpp-sbom-builder/internal/slices"
 )
 
 type BinariesDetector struct{}
@@ -103,7 +104,7 @@ func detectBinaryComponent(filename string, seen map[string]*inventory.Component
 			c.PURL = lib.PURLPrefix + "@" + version
 		}
 	}
-	c.LinkLibraries = appendUnique(c.LinkLibraries, filename)
+	c.LinkLibraries = slices.AppendUnique(c.LinkLibraries, filename)
 }
 
 func parseLibraryFilename(filename string) (name, version string) {
