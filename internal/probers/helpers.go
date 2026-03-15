@@ -6,6 +6,18 @@ import (
 	"strings"
 )
 
+// resolveIncPath resolves path against baseDir when path is relative and
+// baseDir is non-empty.  This is needed for compile_commands.json where each
+// entry has a "directory" field that serves as the working directory for the
+// compilation command; relative include paths like -I../third_party must be
+// resolved against that directory, not the process CWD.
+func resolveIncPath(path, baseDir string) string {
+	if path == "" || filepath.IsAbs(path) || baseDir == "" {
+		return path
+	}
+	return filepath.Join(baseDir, path)
+}
+
 func isExternalPath(path, projectRoot string) bool {
 	if path == "" {
 		return false

@@ -1,6 +1,8 @@
 package probers
 
 import (
+	"encoding/json"
+	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -260,6 +262,65 @@ func TestCompileCommands_ExtractsVersionFromPath(t *testing.T) {
 				t.Errorf("zlib version = %q, want 1.2.13 (from path zlib-1.2.13)", c.Version)
 			}
 		}
+	}
+}
+
+func TestResolveIncPath(t *testing.T) {
+	tmp := t.TempDir()
+	absInc := filepath.Join(tmp, "inc")
+	absBase := filepath.Join(tmp, "build")
+
+	cases := []struct {
+		path    string
+		baseDir string
+		want    string
+	}{
+		{absInc, absBase, absInc},
+		{"../third_party/boost", absBase, filepath.Join(absBase, "../third_party/boost")},
+		{"vendor/fmt", absBase, filepath.Join(absBase, "vendor/fmt")},
+		{"../lib", "", "../lib"},
+		{"", "/some/dir", ""},
+	}
+	for _, tc := range cases {
+		got := resolveIncPath(tc.path, tc.baseDir)
+		if got != tc.want {
+			t.Errorf("resolveIncPath(%q, %q) = %q, want %q", tc.path, tc.baseDir, got, tc.want)
+		}
+	}
+}
+
+func TestCompileCommands_RelativePathsResolvedAgainstDirectory(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	projectDir := filepath.Join(tmpDir, "project")
+	buildDir := filepath.Join(projectDir, "build")
+	extDir := filepath.Join(tmpDir, "external", "boost_1_82_0", "include")
+
+	for _, d := range []string{buildDir, extDir} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatalf("mkdir: %v", err)
+		}
+	}
+
+	cc := []ccEntry{{
+		Directory: buildDir,
+		Command:   "g++ -I../../external/boost_1_82_0/include -c main.cpp",
+		File:      "main.cpp",
+	}}
+	data, _ := json.Marshal(cc)
+	ccPath := filepath.Join(projectDir, "compile_commands.json")
+	if err := os.WriteFile(ccPath, data, 0o644); err != nil {
+		t.Fatalf("write compile_commands.json: %v", err)
+	}
+
+	strat := &CompileCommandsDetector{}
+	comps, err := strat.Scan(projectDir, false)
+	if err != nil {
+		t.Fatalf("Scan failed: %v", err)
+	}
+	byName := nameSet(comps)
+	if !byName["boost"] {
+		t.Errorf("expected boost detected from relative include path; got %v", keys(byName))
 	}
 }
 

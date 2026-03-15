@@ -107,8 +107,9 @@ func (s *CompileCommandsDetector) Scan(projectRoot string, verbose bool) ([]*inv
 					if pathutil.RejectPath(incPath) {
 						continue
 					}
-					if isExternalPath(incPath, projectRoot) {
-						externalIncludes[filepath.ToSlash(incPath)] = true
+					resolved := resolveIncPath(incPath, e.Directory)
+					if isExternalPath(resolved, projectRoot) {
+						externalIncludes[filepath.ToSlash(resolved)] = true
 					}
 				}
 			}
@@ -130,13 +131,19 @@ func (s *CompileCommandsDetector) Scan(projectRoot string, verbose bool) ([]*inv
 				switch {
 				case strings.HasPrefix(arg, "-I") && len(arg) > 2:
 					incPath := arg[2:]
-					if !pathutil.RejectPath(incPath) && isExternalPath(incPath, projectRoot) {
-						externalIncludes[filepath.ToSlash(incPath)] = true
+					if !pathutil.RejectPath(incPath) {
+						resolved := resolveIncPath(incPath, e.Directory)
+						if isExternalPath(resolved, projectRoot) {
+							externalIncludes[filepath.ToSlash(resolved)] = true
+						}
 					}
 				case strings.HasPrefix(arg, "/I") && len(arg) > 2:
 					incPath := arg[2:]
-					if !pathutil.RejectPath(incPath) && isExternalPath(incPath, projectRoot) {
-						externalIncludes[filepath.ToSlash(incPath)] = true
+					if !pathutil.RejectPath(incPath) {
+						resolved := resolveIncPath(incPath, e.Directory)
+						if isExternalPath(resolved, projectRoot) {
+							externalIncludes[filepath.ToSlash(resolved)] = true
+						}
 					}
 				case strings.HasPrefix(arg, "-l") && len(arg) > 2:
 					externalLibs[arg[2:]] = true
