@@ -23,8 +23,14 @@ type cdxBOM struct {
 }
 
 type cdxMetadata struct {
-	Timestamp string    `json:"timestamp"`
-	Tools     []cdxTool `json:"tools"`
+	Timestamp string           `json:"timestamp"`
+	Tools     []cdxTool        `json:"tools"`
+	Component *cdxMetaComponent `json:"component,omitempty"`
+}
+
+type cdxMetaComponent struct {
+	Type string `json:"type"`
+	Name string `json:"name"`
 }
 
 type cdxTool struct {
@@ -118,43 +124,44 @@ func buildCycloneDX(result *collector.ScanResult, toolVersion string, minConfide
 	}
 	sort.Slice(deps, func(i, j int) bool { return deps[i].Ref < deps[j].Ref })
 
+	meta := cdxMetadata{
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+		Tools: []cdxTool{
+			{Vendor: "tomBold", Name: "cpp-sbom-builder", Version: toolVersion},
+		},
+	}
+	if result.ProjectName != "" {
+		meta.Component = &cdxMetaComponent{
+			Type: "application",
+			Name: result.ProjectName,
+		}
+	}
+
 	return cdxBOM{
 		BOMFormat:    "CycloneDX",
 		SpecVersion:  "1.5",
 		Version:      1,
 		SerialNumber: generateURN(),
-		Metadata: cdxMetadata{
-			Timestamp: time.Now().UTC().Format(time.RFC3339),
-			Tools: []cdxTool{
-				{Vendor: "tomBold", Name: "cpp-sbom-builder", Version: toolVersion},
-			},
-		},
+		Metadata:     meta,
 		Components:   cdxComps,
 		Dependencies: deps,
 	}
 }
 
 func componentProperties(c *inventory.Component) []cdxProperty {
-	props := []cdxProperty{
-		{Name: "cpp-sbom-builder:detectionSource", Value: c.DetectionSource},
-		{Name: "cpp-sbom-builder:confidence", Value: fmt.Sprintf("%.2f", collector.SourceConfidence(c.DetectionSource))},
-		{Name: "cpp-sbom-builder:dependencyType", Value: c.DependencyType()},
+	var props []cdxProperty
+	if dt := c.DependencyType(); dt != "" {
+		props = append(props, cdxProperty{Name: "sbom:dependencyType", Value: dt})
 	}
 	if c.Revision != "" {
-		props = append(props, cdxProperty{Name: "cpp-sbom-builder:revision", Value: c.Revision})
+		props = append(props, cdxProperty{Name: "sbom:revision", Value: c.Revision})
 	}
 	if c.Channel != "" && c.Channel != "_/_" {
-		props = append(props, cdxProperty{Name: "cpp-sbom-builder:channel", Value: c.Channel})
-	}
-	if len(c.IncludePaths) > 0 {
-		props = append(props, cdxProperty{
-			Name:  "cpp-sbom-builder:includePaths",
-			Value: strings.Join(c.IncludePaths, "; "),
-		})
+		props = append(props, cdxProperty{Name: "sbom:channel", Value: c.Channel})
 	}
 	if len(c.LinkLibraries) > 0 {
 		props = append(props, cdxProperty{
-			Name:  "cpp-sbom-builder:linkLibraries",
+			Name:  "sbom:linkLibraries",
 			Value: strings.Join(c.LinkLibraries, "; "),
 		})
 	}

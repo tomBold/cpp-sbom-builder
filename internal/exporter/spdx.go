@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/tomBold/cpp-sbom-builder/internal/collector"
@@ -13,13 +12,20 @@ import (
 )
 
 type spdxDoc struct {
-	SPDXVersion       string        `json:"spdxVersion"`
-	DataLicense       string        `json:"dataLicense"`
-	SPDXID            string        `json:"SPDXID"`
-	Name              string        `json:"name"`
-	DocumentNamespace string        `json:"documentNamespace"`
-	CreationInfo      spdxCreation  `json:"creationInfo"`
-	Packages          []spdxPackage `json:"packages"`
+	SPDXVersion       string             `json:"spdxVersion"`
+	DataLicense       string             `json:"dataLicense"`
+	SPDXID            string             `json:"SPDXID"`
+	Name              string             `json:"name"`
+	DocumentNamespace string             `json:"documentNamespace"`
+	CreationInfo      spdxCreation       `json:"creationInfo"`
+	Packages          []spdxPackage      `json:"packages"`
+	Relationships     []spdxRelationship `json:"relationships"`
+}
+
+type spdxRelationship struct {
+	Element string `json:"spdxElementId"`
+	Type    string `json:"relationshipType"`
+	Related string `json:"relatedSpdxElement"`
 }
 
 type spdxCreation struct {
@@ -93,7 +99,19 @@ func buildSPDX(result *collector.ScanResult, toolVersion string, minConfidence f
 		pkgs = append(pkgs, pkg)
 	}
 
-	docName := "cpp-sbom-builder-" + strings.ReplaceAll(toolVersion, ".", "-")
+	rels := make([]spdxRelationship, 0, len(pkgs))
+	for _, pkg := range pkgs {
+		rels = append(rels, spdxRelationship{
+			Element: "SPDXRef-DOCUMENT",
+			Type:    "DESCRIBES",
+			Related: pkg.SPDXID,
+		})
+	}
+
+	docName := result.ProjectName
+	if docName == "" {
+		docName = "unknown-project"
+	}
 
 	return spdxDoc{
 		SPDXVersion:       "SPDX-2.3",
@@ -105,6 +123,7 @@ func buildSPDX(result *collector.ScanResult, toolVersion string, minConfidence f
 			Created:  time.Now().UTC().Format(time.RFC3339),
 			Creators: []string{"Tool: cpp-sbom-builder-" + toolVersion},
 		},
-		Packages: pkgs,
+		Packages:      pkgs,
+		Relationships: rels,
 	}
 }

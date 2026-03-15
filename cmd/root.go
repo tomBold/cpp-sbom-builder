@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -43,11 +44,14 @@ var scanCmd = &cobra.Command{
 	Use:   "scan",
 	Short: "Scan a C++ project and generate an SBOM",
 	Long: `Scan a C++ project directory for third-party dependencies and produce
-a CycloneDX 1.5 or SPDX 2.3 JSON SBOM (default: sbom-cyclonedx.json or sbom-spdx.json).
+a CycloneDX 1.5 or SPDX 2.3 JSON SBOM. Output files are written to the
+output/ folder with a timestamp by default (e.g. output/sbom-cyclonedx-2026-03-15_14-30-22.json)
+so successive runs never overwrite previous results.
 
 Examples:
   cpp-sbom-builder scan --dir /path/to/project
   cpp-sbom-builder scan --dir /path/to/project --format spdx
+  cpp-sbom-builder scan --dir . --output my-sbom.json
   cpp-sbom-builder scan --dir . --output - --verbose
   cpp-sbom-builder scan --dir /path/to/project --show-strategies`,
 	RunE: runScan,
@@ -55,7 +59,7 @@ Examples:
 
 func init() {
 	scanCmd.Flags().StringVarP(&flagDir, "dir", "d", ".", "Path to the C++ project root directory")
-	scanCmd.Flags().StringVarP(&flagOutput, "output", "o", "sbom-cyclonedx.json", "Output file path (use '-' for stdout)")
+	scanCmd.Flags().StringVarP(&flagOutput, "output", "o", "", "Output file path (use '-' for stdout; default: timestamped filename)")
 	scanCmd.Flags().StringVarP(&flagFormat, "format", "f", "cyclonedx", "Output format: cyclonedx, spdx")
 	scanCmd.Flags().BoolVarP(&flagVerbose, "verbose", "v", false, "Enable verbose output")
 	scanCmd.Flags().BoolVar(&flagShowStrategies, "show-strategies", false, "Print which strategies fired after scanning")
@@ -94,7 +98,7 @@ func runScan(cmd *cobra.Command, args []string) error {
 	fmt.Fprintf(statusOut, "cpp-sbom-builder v%s\n", toolVersion)
 	fmt.Fprintf(statusOut, "Scanning: %s\n", absDir)
 
-	s := collector.New(absDir, flagVerbose)
+	s := collector.New(absDir, flagVerbose, collector.DefaultDetectors())
 	result, err := s.Scan()
 	if err != nil {
 		return fmt.Errorf("scan failed: %w", err)
@@ -112,8 +116,17 @@ func runScan(cmd *cobra.Command, args []string) error {
 	}
 
 	outputPath := flagOutput
-	if flagOutput != "-" && flagFormat == "spdx" && flagOutput == "sbom-cyclonedx.json" {
-		outputPath = "sbom-spdx.json"
+	if outputPath == "" {
+		if err := os.MkdirAll("output", 0o755); err != nil {
+			return fmt.Errorf("cannot create output directory: %w", err)
+		}
+		ts := time.Now().Format("2006-01-02_15-04-05")
+		switch flagFormat {
+		case "spdx":
+			outputPath = filepath.Join("output", fmt.Sprintf("sbom-spdx-%s.json", ts))
+		default:
+			outputPath = filepath.Join("output", fmt.Sprintf("sbom-cyclonedx-%s.json", ts))
+		}
 	}
 
 	switch flagFormat {

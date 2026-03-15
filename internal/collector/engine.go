@@ -2,6 +2,7 @@ package collector
 
 import (
 	"fmt"
+	"path/filepath"
 	"sort"
 	"sync"
 
@@ -15,34 +16,61 @@ type Detector interface {
 	Scan(projectRoot string, verbose bool) ([]*inventory.Component, error)
 }
 
+// GraphDetector extends Detector with dependency-graph data.
+// The engine merges edges and direct-name sets from every
+// GraphDetector into a single graph used for SBOM output.
+type GraphDetector interface {
+	Detector
+	ScanGraph(projectRoot string, verbose bool) (
+		components []*inventory.Component,
+		directNames map[string]bool,
+		edges map[string][]string,
+	)
+}
+
 type ScanResult struct {
+	ProjectName       string
 	Components        []*inventory.Component
 	DependencyTree    *inventory.DependencyTree
 	StrategiesUsed    []string
 	StrategiesSkipped []string
 }
 
+// DefaultDetectors returns the built-in detector set.
+func DefaultDetectors() []Detector {
+	return []Detector{
+		&probers.ConanDetector{},
+		&probers.VcpkgDetector{},
+		&probers.CMakeDetector{},
+		&probers.CompileCommandsDetector{},
+		&probers.BinariesDetector{},
+		&probers.HeadersDetector{},
+	}
+}
+
 type Engine struct {
 	ProjectRoot string
 	Verbose     bool
+	detectors   []Detector
 }
 
-func New(projectRoot string, verbose bool) *Engine {
-	return &Engine{ProjectRoot: projectRoot, Verbose: verbose}
+func New(projectRoot string, verbose bool, detectors []Detector) *Engine {
+	return &Engine{ProjectRoot: projectRoot, Verbose: verbose, detectors: detectors}
 }
 
 func (e *Engine) Scan() (*ScanResult, error) {
-	outputs := e.runDetectors()
-	components, fired, quiet := e.foldOutputs(outputs)
+	r := e.runDetectors()
+	components, fired, quiet := e.foldOutputs(r)
 
 	probers.ScanVersionHints(components, e.ProjectRoot)
 
-	e.attachEdges(components, outputs.conanGraph)
-	e.markDirectTransitive(components, outputs.conanGraph, outputs.outputs)
+	e.attachEdges(components, r.edges)
+	e.markDirectTransitive(components, r.directNames, r.outputs)
 
 	tree := inventory.BuildDependencyTree(components)
 
 	return &ScanResult{
+		ProjectName:       filepath.Base(e.ProjectRoot),
 		Components:        components,
 		DependencyTree:    tree,
 		StrategiesUsed:    fired,
@@ -51,46 +79,40 @@ func (e *Engine) Scan() (*ScanResult, error) {
 }
 
 type detectorOutput struct {
-	name       string
-	components []*inventory.Component
-	err        error
+	name        string
+	components  []*inventory.Component
+	err         error
+	directNames map[string]bool
+	edges       map[string][]string
 }
 
 type runResult struct {
-	outputs    []detectorOutput
-	conanGraph *probers.ConanScanResult
+	outputs     []detectorOutput
+	directNames map[string]bool
+	edges       map[string][]string
 }
 
 func (e *Engine) runDetectors() runResult {
-	conanDet := &probers.ConanDetector{}
-	conanGraph := conanDet.ScanWithGraph(e.ProjectRoot, e.Verbose)
-
-	others := []Detector{
-		&probers.VcpkgDetector{},
-		&probers.CMakeDetector{},
-		&probers.CompileCommandsDetector{},
-		&probers.BinariesDetector{},
-		&probers.HeadersDetector{},
-	}
-
-	ch := make(chan detectorOutput, len(others)+1)
+	ch := make(chan detectorOutput, len(e.detectors))
 	var wg sync.WaitGroup
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		ch <- detectorOutput{name: conanDet.Name(), components: conanGraph.Components}
-	}()
-
-	for _, d := range others {
+	for _, d := range e.detectors {
 		wg.Add(1)
 		go func(det Detector) {
 			defer wg.Done()
 			if e.Verbose {
 				fmt.Printf("[engine] Running detector: %s\n", det.Name())
 			}
-			comps, err := det.Scan(e.ProjectRoot, e.Verbose)
-			ch <- detectorOutput{name: det.Name(), components: comps, err: err}
+			if gd, ok := det.(GraphDetector); ok {
+				comps, direct, edges := gd.ScanGraph(e.ProjectRoot, e.Verbose)
+				ch <- detectorOutput{
+					name: det.Name(), components: comps,
+					directNames: direct, edges: edges,
+				}
+			} else {
+				comps, err := det.Scan(e.ProjectRoot, e.Verbose)
+				ch <- detectorOutput{name: det.Name(), components: comps, err: err}
+			}
 		}(d)
 	}
 
@@ -100,11 +122,20 @@ func (e *Engine) runDetectors() runResult {
 	}()
 
 	var outputs []detectorOutput
+	mergedDirect := make(map[string]bool)
+	mergedEdges := make(map[string][]string)
+
 	for o := range ch {
 		outputs = append(outputs, o)
+		for k, v := range o.directNames {
+			mergedDirect[k] = v
+		}
+		for k, vs := range o.edges {
+			mergedEdges[k] = append(mergedEdges[k], vs...)
+		}
 	}
 
-	return runResult{outputs: outputs, conanGraph: conanGraph}
+	return runResult{outputs: outputs, directNames: mergedDirect, edges: mergedEdges}
 }
 
 func (e *Engine) foldOutputs(r runResult) (components []*inventory.Component, fired, quiet []string) {
@@ -144,18 +175,18 @@ func (e *Engine) foldOutputs(r runResult) (components []*inventory.Component, fi
 	return sortedComponents(merged), fired, quiet
 }
 
-func (e *Engine) attachEdges(components []*inventory.Component, conanGraph *probers.ConanScanResult) {
-	edges := make(map[string][]string)
-	for parent, children := range conanGraph.Edges {
+func (e *Engine) attachEdges(components []*inventory.Component, edges map[string][]string) {
+	normalized := make(map[string][]string)
+	for parent, children := range edges {
 		pk := inventory.NormalizeKey(parent)
 		for _, child := range children {
-			edges[pk] = slices.AppendUnique(edges[pk], child)
+			normalized[pk] = slices.AppendUnique(normalized[pk], child)
 		}
 	}
 
 	for _, c := range components {
 		key := inventory.NormalizeKey(c.Name)
-		if children, ok := edges[key]; ok {
+		if children, ok := normalized[key]; ok {
 			for _, child := range children {
 				c.Dependencies = slices.AppendUnique(c.Dependencies, child)
 			}
@@ -163,9 +194,9 @@ func (e *Engine) attachEdges(components []*inventory.Component, conanGraph *prob
 	}
 }
 
-func (e *Engine) markDirectTransitive(components []*inventory.Component, conanGraph *probers.ConanScanResult, outputs []detectorOutput) {
+func (e *Engine) markDirectTransitive(components []*inventory.Component, graphDirectNames map[string]bool, outputs []detectorOutput) {
 	directNames := make(map[string]bool)
-	for name := range conanGraph.DirectNames {
+	for name := range graphDirectNames {
 		directNames[inventory.NormalizeKey(name)] = true
 	}
 

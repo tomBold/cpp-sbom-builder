@@ -149,12 +149,25 @@ func parseCMakeCache(path, projectRoot string, seen map[string]*inventory.Compon
 	}
 }
 
+func stripCMakeComments(src string) string {
+	var b strings.Builder
+	for _, line := range strings.Split(src, "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "#") {
+			b.WriteByte('\n')
+			continue
+		}
+		b.WriteString(line)
+		b.WriteByte('\n')
+	}
+	return b.String()
+}
+
 func parseCMakeLists(path string, seen map[string]*inventory.Component, versions map[string]string) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return
 	}
-	content := string(data)
+	content := stripCMakeComments(string(data))
 
 	for _, m := range reFindPackage.FindAllStringSubmatch(content, -1) {
 		pkgName := m[1]

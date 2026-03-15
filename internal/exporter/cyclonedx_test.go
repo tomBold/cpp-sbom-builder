@@ -18,7 +18,7 @@ func sampleDir() string {
 
 func mustScan(t *testing.T) *collector.ScanResult {
 	t.Helper()
-	s := collector.New(sampleDir(), false)
+	s := collector.New(sampleDir(), false, collector.DefaultDetectors())
 	result, err := s.Scan()
 	if err != nil {
 		t.Fatalf("Scan failed: %v", err)

@@ -33,7 +33,7 @@ var reConanRef = regexp.MustCompile(`^([A-Za-z0-9_\-\.]+)/([A-Za-z0-9_\-\.]+)(@[
 
 var reConanfileTxtRequires = regexp.MustCompile(`^\s*([A-Za-z0-9_\-\.]+)/([A-Za-z0-9_\-\.]+)(@[^\s#]*)?(?:#([A-Za-z0-9\-_]+))?`)
 
-var reConanfilePyRequires = regexp.MustCompile(`(?:self\.requires|self\.build_requires)\s*\(\s*["']([A-Za-z0-9_\-\.]+)/([A-Za-z0-9_\-\.]+)(@[^#"']*)?(?:#([A-Za-z0-9\-_]+))?[^"']*["']`)
+var reConanfilePyRequires = regexp.MustCompile(`(?:self\.requires|self\.build_requires|self\.test_requires|self\.tool_requires)\s*\(\s*["']([A-Za-z0-9_\-\.]+)/([A-Za-z0-9_\-\.]+)(@[^#"']*)?(?:#([A-Za-z0-9\-_]+))?[^"']*["']`)
 
 var reConanfilePyPythonRequires = regexp.MustCompile(`python_requires\s*=\s*["']([A-Za-z0-9_\-\.]+)/([A-Za-z0-9_\-\.]+)(@[^#"']*)?(?:#([A-Za-z0-9\-_]+))?[^"']*["']`)
 
@@ -45,6 +45,13 @@ type ConanScanResult struct {
 
 func (s *ConanDetector) Scan(projectRoot string, verbose bool) ([]*inventory.Component, error) {
 	return s.ScanWithGraph(projectRoot, verbose).Components, nil
+}
+
+// ScanGraph satisfies collector.GraphDetector, returning components
+// together with dependency edges and direct-dependency classification.
+func (s *ConanDetector) ScanGraph(projectRoot string, verbose bool) ([]*inventory.Component, map[string]bool, map[string][]string) {
+	r := s.ScanWithGraph(projectRoot, verbose)
+	return r.Components, r.DirectNames, r.Edges
 }
 
 func (s *ConanDetector) ScanWithGraph(projectRoot string, verbose bool) *ConanScanResult {
@@ -162,7 +169,7 @@ func parseConanLockWithGraph(path string) *lockGraphResult {
 
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(data, &raw); err == nil {
-		for _, key := range []string{"requires", "build_requires"} {
+		for _, key := range []string{"requires", "build_requires", "test_requires", "tool_requires"} {
 			if reqRaw, ok := raw[key]; ok {
 				var refs []string
 				if err := json.Unmarshal(reqRaw, &refs); err == nil {
@@ -195,7 +202,6 @@ func parseConanfileTxtWithDirect(path string) ([]*inventory.Component, map[strin
 	const (
 		sectionNone sectionKind = iota
 		sectionRequires
-		sectionBuildRequires
 	)
 	currentSection := sectionNone
 
@@ -207,10 +213,8 @@ func parseConanfileTxtWithDirect(path string) ([]*inventory.Component, map[strin
 		}
 		if strings.HasPrefix(line, "[") {
 			switch strings.ToLower(line) {
-			case "[requires]":
+			case "[requires]", "[build_requires]", "[test_requires]", "[tool_requires]":
 				currentSection = sectionRequires
-			case "[build_requires]":
-				currentSection = sectionBuildRequires
 			default:
 				currentSection = sectionNone
 			}
@@ -230,12 +234,25 @@ func parseConanfileTxtWithDirect(path string) ([]*inventory.Component, map[strin
 	return components, directNames
 }
 
+func stripPythonComments(src string) string {
+	var b strings.Builder
+	for _, line := range strings.Split(src, "\n") {
+		if strings.TrimSpace(line) == "" || strings.HasPrefix(strings.TrimSpace(line), "#") {
+			b.WriteByte('\n')
+			continue
+		}
+		b.WriteString(line)
+		b.WriteByte('\n')
+	}
+	return b.String()
+}
+
 func parseConanfilePyWithDirect(path string) ([]*inventory.Component, map[string]bool) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, nil
 	}
-	content := string(data)
+	content := stripPythonComments(string(data))
 
 	var components []*inventory.Component
 	directNames := map[string]bool{}

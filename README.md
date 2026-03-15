@@ -1,6 +1,6 @@
 # cpp-sbom-builder
 
-A **Software Bill of Materials (SBOM) generation engine** for C++ projects. Scans your project folder and produces a valid **CycloneDX 1.5 JSON** file listing all detected third-party dependencies.
+A **Software Bill of Materials (SBOM) generation engine** for C++ projects. Scans your project folder and produces a valid **CycloneDX 1.5** or **SPDX 2.3** JSON file listing all detected third-party dependencies.
 
 ---
 
@@ -39,8 +39,8 @@ A **Software Bill of Materials (SBOM) generation engine** for C++ projects. Scan
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │  STEP 3: Output                                                  │
-│  sbom-cyclonedx.json — CycloneDX 1.5 JSON with components[] and   │
-│  dependencies[] (name, version, purl, detectionSource, etc.)     │
+│  CycloneDX 1.5 or SPDX 2.3 JSON with components, dependencies,  │
+│  name, version, purl, detectionSource, etc.                      │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -58,16 +58,18 @@ cd cpp-sbom-builder
 **Option A — run without building:**
 
 ```bash
-go run . scan --dir ./demo --output sbom-cyclonedx.json --verbose
+go run . scan --dir ./demo --verbose
 ```
 
 **Option B — build then run:**
 
 ```bash
 go build -o cpp-sbom-builder .
-./cpp-sbom-builder scan --dir ./demo --output sbom-cyclonedx.json --verbose   # Linux/macOS
-.\cpp-sbom-builder.exe scan --dir .\demo --output sbom-cyclonedx.json --verbose   # Windows
+./cpp-sbom-builder scan --dir ./demo --verbose          # Linux/macOS
+.\cpp-sbom-builder.exe scan --dir .\demo --verbose      # Windows
 ```
+
+Output is written to the `output/` folder with a timestamped filename (e.g. `output/sbom-cyclonedx-2026-03-15_14-30-21.json`) by default. The folder is created automatically. Use `--output <path>` to write to a specific path instead.
 
 **Need:** Go 1.22+. No compiler, CMake, or Conan required.
 
@@ -75,23 +77,38 @@ go build -o cpp-sbom-builder .
 
 ## Run Against Sample Project
 
-The `demo/` folder is a fake C++ project that triggers every detector:
+The `demo/` folder is a synthetic C++ project that triggers every detector:
 
 ```bash
-go run . scan --dir ./demo --output sbom-cyclonedx.json --verbose --show-strategies
+go run . scan --dir ./demo --verbose --show-strategies
 ```
 
 (Or `.\cpp-sbom-builder.exe scan ...` on Windows after building.)
+
+To generate SPDX instead of CycloneDX:
+
+```bash
+go run . scan --dir ./demo --format spdx --verbose
+```
 
 ## Run Against Your Project
 
 Point at your project root (after build, so `compile_commands.json` exists if you use CMake):
 
 ```bash
-go run . scan --dir /path/to/your/project --output sbom-cyclonedx.json
+go run . scan --dir /path/to/your/project
 ```
 
-**Flags:** `--dir` (folder to scan), `--output` (file or `-` for stdout), `--format` (`cyclonedx` or `spdx`), `--verbose`, `--show-strategies`, `--min-confidence` (0–1).
+**Flags:**
+
+| Flag | Description | Default |
+| --- | --- | --- |
+| `--dir` | Folder to scan | (required) |
+| `--output` | Output file path, or `-` for stdout | auto-timestamped |
+| `--format` | `cyclonedx` or `spdx` | `cyclonedx` |
+| `--verbose` | Print what each detector finds | `false` |
+| `--show-strategies` | List detection strategies used | `false` |
+| `--min-confidence` | Only include components ≥ this score (0–1) | `0` |
 
 ---
 
@@ -110,18 +127,45 @@ go run . scan --dir /path/to/your/project --output sbom-cyclonedx.json
 
 ## Output Format
 
-Default output: `sbom-cyclonedx.json` (CycloneDX) or `sbom-spdx.json` (SPDX). Use `--output` to change path; use `-` for stdout.
+When `--output` is omitted, the tool writes a timestamped file into the `output/` folder so repeated runs never overwrite previous results:
 
-| Format | Flag | Typical output file |
+| Format | Flag | Example output file |
 | --- | --- | --- |
-| **CycloneDX 1.5** | `--format cyclonedx` (default) | `sbom-cyclonedx.json` |
-| **SPDX 2.3** | `--format spdx` | `sbom-spdx.json` |
+| **CycloneDX 1.5** | `--format cyclonedx` (default) | `output/sbom-cyclonedx-2026-03-15_14-30-21.json` |
+| **SPDX 2.3** | `--format spdx` | `output/sbom-spdx-2026-03-15_14-30-21.json` |
 
 ```bash
-go run . scan --dir ./demo                    # CycloneDX → sbom-cyclonedx.json
-go run . scan --dir ./demo --format spdx     # SPDX → sbom-spdx.json
+go run . scan --dir ./demo                    # CycloneDX → output/sbom-cyclonedx-*.json
+go run . scan --dir ./demo --format spdx     # SPDX → output/sbom-spdx-*.json
+go run . scan --dir ./demo --output sbom.json # specific path
 go run . scan --dir ./demo --output -        # JSON to stdout
 ```
+
+---
+
+## Architecture
+
+The scan engine uses **dependency injection** for detectors. Every detector satisfies a `Detector` interface; detectors that also provide a dependency graph satisfy `GraphDetector`:
+
+```go
+type Detector interface {
+    Name() string
+    Scan(projectRoot string, verbose bool) []*inventory.Component
+}
+
+type GraphDetector interface {
+    Detector
+    ScanGraph(projectRoot string, verbose bool) ([]*inventory.Component, map[string]bool, map[string][]string)
+}
+```
+
+`collector.New()` accepts a `[]Detector` slice, making it easy to swap, add, or mock detectors in tests:
+
+```go
+engine := collector.New(projectRoot, verbose, collector.DefaultDetectors())
+```
+
+All 6 detectors run in parallel. Results are deduplicated, merged by confidence ranking, and enriched with dependency-graph edges (direct vs. transitive) from `GraphDetector` implementations.
 
 ---
 
@@ -131,7 +175,7 @@ go run . scan --dir ./demo --output -        # JSON to stdout
 go test ./...
 ```
 
-Unit tests for probers, collector, registry, inventory; integration tests for SBOM output.
+Unit tests for probers, collector, registry, and inventory; integration tests for SBOM output. The collector tests include fake detectors injected via the `Detector` interface to verify the engine independently of real file parsing.
 
 ---
 
@@ -145,7 +189,7 @@ Unit tests for probers, collector, registry, inventory; integration tests for SB
 | **Internal** (your own headers) | If the include path points to a file inside the project (`include/`, `src/`, `lib/`) → skip. Quoted `"foo.h"` → skip. |
 | **Third-party** (`&lt;boost/...&gt;`, `&lt;openssl/...&gt;`) | Only angle-bracket includes that match our library catalog are reported. |
 
-**Other inaccuracies:** Libraries not in the catalog are dropped. Binary scanner only looks at filenames. CMake variables like `${DEPS}` are not expanded. `compile_commands.json` may miss generated files.
+**Other inaccuracies:** Libraries not in the catalog are dropped. Binary scanner only looks at filenames. CMake variables like `${DEPS}` are not expanded. `compile_commands.json` may miss generated files. Commented-out lines in `conanfile.py` and `CMakeLists.txt` are stripped before parsing to prevent false positives.
 
 ---
 
