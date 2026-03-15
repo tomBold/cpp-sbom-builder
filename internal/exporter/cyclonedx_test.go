@@ -2,23 +2,17 @@ package exporter
 
 import (
 	"encoding/json"
-	"path/filepath"
 	"regexp"
-	"runtime"
 	"testing"
 
 	"github.com/tomBold/cpp-sbom-builder/internal/collector"
+	"github.com/tomBold/cpp-sbom-builder/internal/probers"
+	"github.com/tomBold/cpp-sbom-builder/internal/testutil"
 )
-
-func sampleDir() string {
-	_, file, _, _ := runtime.Caller(0)
-	root := filepath.Join(filepath.Dir(file), "..", "..")
-	return filepath.Join(root, "demo")
-}
 
 func mustScan(t *testing.T) *collector.ScanResult {
 	t.Helper()
-	s := collector.New(sampleDir(), false, collector.DefaultDetectors())
+	s := collector.New(testutil.DemoDir(), false, collector.DefaultDetectors())
 	result, err := s.Scan()
 	if err != nil {
 		t.Fatalf("Scan failed: %v", err)
@@ -92,7 +86,15 @@ func TestCycloneDX_MinConfidenceFilter(t *testing.T) {
 }
 
 func TestCycloneDX_SourceConfidence(t *testing.T) {
-	sources := []string{"conan", "vcpkg", "compile_commands.json", "cmake", "binary-scan", "header-scan", "unknown"}
+	sources := []string{
+		string(probers.DetectorConan),
+		string(probers.DetectorVcpkg),
+		string(probers.DetectorCompileCommands),
+		string(probers.DetectorCMake),
+		string(probers.DetectorBinaryScan),
+		string(probers.DetectorHeaderScan),
+		"unknown",
+	}
 	for _, src := range sources {
 		c := collector.SourceConfidence(src)
 		if c < 0 || c > 1 {

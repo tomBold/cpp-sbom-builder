@@ -2,21 +2,15 @@ package collector
 
 import (
 	"fmt"
-	"path/filepath"
-	"runtime"
 	"testing"
 
 	"github.com/tomBold/cpp-sbom-builder/internal/inventory"
+	"github.com/tomBold/cpp-sbom-builder/internal/probers"
+	"github.com/tomBold/cpp-sbom-builder/internal/testutil"
 )
 
-func demoDir() string {
-	_, file, _, _ := runtime.Caller(0)
-	root := filepath.Join(filepath.Dir(file), "..", "..")
-	return filepath.Join(root, "demo")
-}
-
 func TestEngine_Scan_ReturnsComponents(t *testing.T) {
-	e := New(demoDir(), false, DefaultDetectors())
+	e := New(testutil.DemoDir(), false, DefaultDetectors())
 	result, err := e.Scan()
 	if err != nil {
 		t.Fatalf("Scan failed: %v", err)
@@ -30,7 +24,7 @@ func TestEngine_Scan_ReturnsComponents(t *testing.T) {
 }
 
 func TestEngine_Scan_StrategiesUsed(t *testing.T) {
-	e := New(demoDir(), false, DefaultDetectors())
+	e := New(testutil.DemoDir(), false, DefaultDetectors())
 	result, err := e.Scan()
 	if err != nil {
 		t.Fatalf("Scan failed: %v", err)
@@ -41,7 +35,7 @@ func TestEngine_Scan_StrategiesUsed(t *testing.T) {
 }
 
 func TestEngine_Scan_DeduplicatesByName(t *testing.T) {
-	e := New(demoDir(), false, DefaultDetectors())
+	e := New(testutil.DemoDir(), false, DefaultDetectors())
 	result, err := e.Scan()
 	if err != nil {
 		t.Fatalf("Scan failed: %v", err)
@@ -61,23 +55,23 @@ func TestFoldOutputs_DeterministicRegardlessOfOrder(t *testing.T) {
 
 	conanOut := func() detectorOutput {
 		return detectorOutput{
-			name: "conan",
+			name: string(probers.DetectorConan),
 			components: []*inventory.Component{{
 				Name:            "openssl",
 				Version:         "3.1.0",
 				PURL:            "pkg:conan/openssl@3.1.0",
-				DetectionSource: "conan",
+				DetectionSource: string(probers.DetectorConan),
 				Description:     "TLS library",
 			}},
 		}
 	}
 	headerOut := func() detectorOutput {
 		return detectorOutput{
-			name: "header-scan",
+			name: string(probers.DetectorHeaderScan),
 			components: []*inventory.Component{{
 				Name:            "openssl",
 				Version:         "unknown",
-				DetectionSource: "header-scan",
+				DetectionSource: string(probers.DetectorHeaderScan),
 				IncludePaths:    []string{"/usr/include/openssl"},
 			}},
 		}
@@ -94,8 +88,8 @@ func TestFoldOutputs_DeterministicRegardlessOfOrder(t *testing.T) {
 	comps1, fired1, _ := engine.foldOutputs(r1)
 	comps2, fired2, _ := engine.foldOutputs(r2)
 
-	c1 := findComponent(comps1, "openssl")
-	c2 := findComponent(comps2, "openssl")
+	c1 := testutil.FindComponent(comps1, "openssl")
+	c2 := testutil.FindComponent(comps2, "openssl")
 
 	if c1 == nil || c2 == nil {
 		t.Fatal("expected openssl in both results")
@@ -126,22 +120,22 @@ func TestFoldOutputs_HigherTrustDataPreferred(t *testing.T) {
 	r := runResult{
 		outputs: []detectorOutput{
 			{
-				name: "header-scan",
+				name: string(probers.DetectorHeaderScan),
 				components: []*inventory.Component{{
 					Name:            "zlib",
 					Version:         "unknown",
-					DetectionSource: "header-scan",
+					DetectionSource: string(probers.DetectorHeaderScan),
 					Description:     "compression",
 					IncludePaths:    []string{"/usr/include/zlib.h"},
 				}},
 			},
 			{
-				name: "conan",
+				name: string(probers.DetectorConan),
 				components: []*inventory.Component{{
 					Name:            "zlib",
 					Version:         "1.3.1",
 					PURL:            "pkg:conan/zlib@1.3.1",
-					DetectionSource: "conan",
+					DetectionSource: string(probers.DetectorConan),
 					Description:     "A massively spiffy yet delicately unobtrusive compression library",
 				}},
 			},
@@ -151,14 +145,14 @@ func TestFoldOutputs_HigherTrustDataPreferred(t *testing.T) {
 	}
 
 	comps, _, _ := engine.foldOutputs(r)
-	c := findComponent(comps, "zlib")
+	c := testutil.FindComponent(comps, "zlib")
 	if c == nil {
 		t.Fatal("expected zlib component")
 	}
 	if c.Version != "1.3.1" {
 		t.Errorf("expected version 1.3.1 from conan, got %q", c.Version)
 	}
-	if c.DetectionSource != "conan" {
+	if c.DetectionSource != string(probers.DetectorConan) {
 		t.Errorf("expected conan source, got %q", c.DetectionSource)
 	}
 	if c.Description != "A massively spiffy yet delicately unobtrusive compression library" {
@@ -174,10 +168,10 @@ func TestFoldOutputs_ErroredDetectorSkipped(t *testing.T) {
 
 	r := runResult{
 		outputs: []detectorOutput{
-			{name: "conan", components: []*inventory.Component{{
-				Name: "boost", Version: "1.84.0", DetectionSource: "conan",
+			{name: string(probers.DetectorConan), components: []*inventory.Component{{
+				Name: "boost", Version: "1.84.0", DetectionSource: string(probers.DetectorConan),
 			}}},
-			{name: "vcpkg", err: fmt.Errorf("vcpkg not found")},
+			{name: string(probers.DetectorVcpkg), err: fmt.Errorf("vcpkg not found")},
 		},
 		directNames: make(map[string]bool),
 		edges:       make(map[string][]string),
@@ -185,25 +179,15 @@ func TestFoldOutputs_ErroredDetectorSkipped(t *testing.T) {
 
 	comps, fired, quiet := engine.foldOutputs(r)
 
-	if findComponent(comps, "boost") == nil {
+	if testutil.FindComponent(comps, "boost") == nil {
 		t.Error("expected boost component")
 	}
-	if len(fired) != 1 || fired[0] != "conan" {
+	if len(fired) != 1 || fired[0] != string(probers.DetectorConan) {
 		t.Errorf("expected fired=[conan], got %v", fired)
 	}
-	if len(quiet) != 1 || quiet[0] != "vcpkg" {
+	if len(quiet) != 1 || quiet[0] != string(probers.DetectorVcpkg) {
 		t.Errorf("expected quiet=[vcpkg], got %v", quiet)
 	}
-}
-
-func findComponent(comps []*inventory.Component, name string) *inventory.Component {
-	key := inventory.NormalizeKey(name)
-	for _, c := range comps {
-		if inventory.NormalizeKey(c.Name) == key {
-			return c
-		}
-	}
-	return nil
 }
 
 func TestSortedComponents_DeterministicOrder(t *testing.T) {
@@ -295,8 +279,8 @@ func TestEngine_WithGraphDetector(t *testing.T) {
 		t.Fatalf("expected 2 components, got %d", len(result.Components))
 	}
 
-	a := findComponent(result.Components, "libA")
-	b := findComponent(result.Components, "libB")
+	a := testutil.FindComponent(result.Components, "libA")
+	b := testutil.FindComponent(result.Components, "libB")
 	if a == nil || b == nil {
 		t.Fatal("expected both libA and libB")
 	}

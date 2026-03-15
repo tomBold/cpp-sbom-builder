@@ -16,7 +16,7 @@ import (
 
 type HeadersDetector struct{}
 
-func (s *HeadersDetector) Name() string { return "header-scan" }
+func (s *HeadersDetector) Name() string { return string(DetectorHeaderScan) }
 
 var (
 	reInclude      = regexp.MustCompile(`^\s*#\s*include\s*([<"])([^>"]+)[>"]`)
@@ -30,10 +30,9 @@ var sourceExts = map[string]bool{
 	".inl": true, ".ipp": true, ".tpp": true,
 }
 
-var excludedDirs = map[string]bool{
+var headerExtraDirs = map[string]bool{
 	"CMakeFiles": true, "build": true, "out": true, "_build": true,
-	".build": true, "node_modules": true, "vendor": true,
-	"third_party": true, "external": true, "extern": true,
+	".build": true, "third_party": true, "external": true, "extern": true,
 	"bazel-bin": true, "bazel-out": true, "bazel-testlogs": true,
 }
 
@@ -41,30 +40,18 @@ func (s *HeadersDetector) Scan(projectRoot string, verbose bool) ([]*inventory.C
 	seen := map[string]*inventory.Component{}
 	fileCount := 0
 
-	_ = filepath.WalkDir(projectRoot, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return nil
-		}
-		if d.IsDir() {
-			name := d.Name()
-			if strings.HasPrefix(name, ".") || excludedDirs[name] {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-
+	WalkProject(projectRoot, headerExtraDirs, func(path string, d os.DirEntry) {
 		ext := strings.ToLower(filepath.Ext(d.Name()))
 		if !sourceExts[ext] {
-			return nil
+			return
 		}
 
 		fileCount++
 		extractIncludesFromFile(path, projectRoot, seen)
-		return nil
 	})
 
 	if verbose {
-		fmt.Printf("  [header-scan] Scanned %d source/header files, found %d components\n", fileCount, len(seen))
+		fmt.Printf("  [%s] Scanned %d source/header files, found %d components\n", DetectorHeaderScan, fileCount, len(seen))
 	}
 
 	result := make([]*inventory.Component, 0, len(seen))
@@ -116,7 +103,7 @@ func extractIncludesFromFile(path, projectRoot string, seen map[string]*inventor
 				Name:            entry.Name,
 				Version:         "unknown",
 				PURL:            entry.PURLPrefix,
-				DetectionSource: "header-scan",
+				DetectionSource: string(DetectorHeaderScan),
 				Description:     entry.Description,
 			}
 			seen[entry.Name] = c

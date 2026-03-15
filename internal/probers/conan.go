@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -16,7 +15,7 @@ import (
 
 type ConanDetector struct{}
 
-func (s *ConanDetector) Name() string { return "conan" }
+func (s *ConanDetector) Name() string { return string(DetectorConan) }
 
 type conanLockV1 struct {
 	GraphLock struct {
@@ -60,22 +59,11 @@ func (s *ConanDetector) ScanWithGraph(projectRoot string, verbose bool) *ConanSc
 		Edges:       map[string][]string{},
 	}
 
-	_ = filepath.WalkDir(projectRoot, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return nil
-		}
-		if d.IsDir() {
-			name := d.Name()
-			if strings.HasPrefix(name, ".git") || name == "node_modules" {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-
+	WalkProject(projectRoot, nil, func(path string, d os.DirEntry) {
 		switch strings.ToLower(d.Name()) {
 		case "conan.lock":
 			if verbose {
-				fmt.Printf("  [conan] Parsing conan.lock: %s\n", path)
+				fmt.Printf("  [%s] Parsing conan.lock: %s\n", DetectorConan, path)
 			}
 			lr := parseConanLockWithGraph(path)
 			result.Components = append(result.Components, lr.Components...)
@@ -88,7 +76,7 @@ func (s *ConanDetector) ScanWithGraph(projectRoot string, verbose bool) *ConanSc
 
 		case "conanfile.txt":
 			if verbose {
-				fmt.Printf("  [conan] Parsing conanfile.txt: %s\n", path)
+				fmt.Printf("  [%s] Parsing conanfile.txt: %s\n", DetectorConan, path)
 			}
 			comps, directNames := parseConanfileTxtWithDirect(path)
 			result.Components = append(result.Components, comps...)
@@ -98,7 +86,7 @@ func (s *ConanDetector) ScanWithGraph(projectRoot string, verbose bool) *ConanSc
 
 		case "conanfile.py":
 			if verbose {
-				fmt.Printf("  [conan] Parsing conanfile.py: %s\n", path)
+				fmt.Printf("  [%s] Parsing conanfile.py: %s\n", DetectorConan, path)
 			}
 			comps, directNames := parseConanfilePyWithDirect(path)
 			result.Components = append(result.Components, comps...)
@@ -106,7 +94,6 @@ func (s *ConanDetector) ScanWithGraph(projectRoot string, verbose bool) *ConanSc
 				result.DirectNames[k] = v
 			}
 		}
-		return nil
 	})
 
 	return result
@@ -136,7 +123,7 @@ func parseConanLockWithGraph(path string) *lockGraphResult {
 			if node.Ref == "" {
 				continue
 			}
-			c := conanRefToComponent(node.Ref, "conan")
+			c := conanRefToComponent(node.Ref, string(DetectorConan))
 			if c == nil {
 				continue
 			}
@@ -174,7 +161,7 @@ func parseConanLockWithGraph(path string) *lockGraphResult {
 				var refs []string
 				if err := json.Unmarshal(reqRaw, &refs); err == nil {
 					for _, ref := range refs {
-						c := conanRefToComponent(ref, "conan")
+						c := conanRefToComponent(ref, string(DetectorConan))
 						if c != nil {
 							result.Components = append(result.Components, c)
 							result.DirectNames[c.Name] = true
@@ -226,7 +213,7 @@ func parseConanfileTxtWithDirect(path string) ([]*inventory.Component, map[strin
 		if m := reConanfileTxtRequires.FindStringSubmatch(line); m != nil {
 			channel := strings.TrimPrefix(m[3], "@")
 			revision := m[4]
-			c := makeConanComponent(m[1], m[2], channel, revision, "conan")
+			c := makeConanComponent(m[1], m[2], channel, revision, string(DetectorConan))
 			components = append(components, c)
 			directNames[c.Name] = true
 		}
@@ -258,13 +245,13 @@ func parseConanfilePyWithDirect(path string) ([]*inventory.Component, map[string
 	directNames := map[string]bool{}
 
 	for _, m := range reConanfilePyRequires.FindAllStringSubmatch(content, -1) {
-		c := makeConanComponent(m[1], m[2], strings.TrimPrefix(m[3], "@"), m[4], "conan")
+		c := makeConanComponent(m[1], m[2], strings.TrimPrefix(m[3], "@"), m[4], string(DetectorConan))
 		components = append(components, c)
 		directNames[c.Name] = true
 	}
 
 	for _, m := range reConanfilePyPythonRequires.FindAllStringSubmatch(content, -1) {
-		c := makeConanComponent(m[1], m[2], strings.TrimPrefix(m[3], "@"), m[4], "conan")
+		c := makeConanComponent(m[1], m[2], strings.TrimPrefix(m[3], "@"), m[4], string(DetectorConan))
 		components = append(components, c)
 		directNames[c.Name] = true
 	}
@@ -273,7 +260,7 @@ func parseConanfilePyWithDirect(path string) ([]*inventory.Component, map[string
 	if lm := reList.FindStringSubmatch(content); lm != nil {
 		reItem := regexp.MustCompile(`["']([A-Za-z0-9_\-\.]+)/([A-Za-z0-9_\-\.]+)(@[^#"']*)?(?:#([a-f0-9\-_]+))?[^"']*["']`)
 		for _, im := range reItem.FindAllStringSubmatch(lm[1], -1) {
-			c := makeConanComponent(im[1], im[2], strings.TrimPrefix(im[3], "@"), im[4], "conan")
+			c := makeConanComponent(im[1], im[2], strings.TrimPrefix(im[3], "@"), im[4], string(DetectorConan))
 			components = append(components, c)
 			directNames[c.Name] = true
 		}

@@ -92,41 +92,42 @@ type runResult struct {
 	edges       map[string][]string
 }
 
+// runDetectors executes all detectors concurrently and collects their
+// results into a fixed-position slice keyed by detector registration
+// order.  This guarantees that outputs is always in the same
+// deterministic order regardless of goroutine scheduling, making every
+// downstream consumer (foldOutputs, markDirectTransitive, attachEdges)
+// reproducible without relying on secondary sorts.
 func (e *Engine) runDetectors() runResult {
-	ch := make(chan detectorOutput, len(e.detectors))
+	outputs := make([]detectorOutput, len(e.detectors))
 	var wg sync.WaitGroup
 
-	for _, d := range e.detectors {
+	for i, d := range e.detectors {
 		wg.Add(1)
-		go func(det Detector) {
+		go func(idx int, det Detector) {
 			defer wg.Done()
 			if e.Verbose {
 				fmt.Printf("[engine] Running detector: %s\n", det.Name())
 			}
 			if gd, ok := det.(GraphDetector); ok {
 				comps, direct, edges := gd.ScanGraph(e.ProjectRoot, e.Verbose)
-				ch <- detectorOutput{
+				outputs[idx] = detectorOutput{
 					name: det.Name(), components: comps,
 					directNames: direct, edges: edges,
 				}
 			} else {
 				comps, err := det.Scan(e.ProjectRoot, e.Verbose)
-				ch <- detectorOutput{name: det.Name(), components: comps, err: err}
+				outputs[idx] = detectorOutput{name: det.Name(), components: comps, err: err}
 			}
-		}(d)
+		}(i, d)
 	}
 
-	go func() {
-		wg.Wait()
-		close(ch)
-	}()
+	wg.Wait()
 
-	var outputs []detectorOutput
 	mergedDirect := make(map[string]bool)
 	mergedEdges := make(map[string][]string)
 
-	for o := range ch {
-		outputs = append(outputs, o)
+	for _, o := range outputs {
 		for k, v := range o.directNames {
 			mergedDirect[k] = v
 		}

@@ -16,7 +16,7 @@ import (
 
 type CompileCommandsDetector struct{}
 
-func (s *CompileCommandsDetector) Name() string { return "compile_commands.json" }
+func (s *CompileCommandsDetector) Name() string { return string(DetectorCompileCommands) }
 
 type ccEntry struct {
 	Directory string   `json:"directory"`
@@ -52,29 +52,19 @@ func (s *CompileCommandsDetector) Scan(projectRoot string, verbose bool) ([]*inv
 		}
 	}
 
-	_ = filepath.WalkDir(projectRoot, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return nil
-		}
-		if d.IsDir() {
-			name := d.Name()
-			if strings.HasPrefix(name, ".") || name == "node_modules" || name == "vendor" {
-				return filepath.SkipDir
-			}
-		}
-		if !d.IsDir() && d.Name() == "compile_commands.json" {
+	WalkProject(projectRoot, nil, func(path string, d os.DirEntry) {
+		if d.Name() == "compile_commands.json" {
 			abs, _ := filepath.Abs(path)
 			if !visited[abs] {
 				discovered = append(discovered, path)
 				visited[abs] = true
 			}
 		}
-		return nil
 	})
 
 	if len(discovered) == 0 {
 		if verbose {
-			fmt.Println("  [compile_commands] No compile_commands.json found")
+			fmt.Printf("  [%s] No compile_commands.json found\n", DetectorCompileCommands)
 		}
 		return nil, nil
 	}
@@ -84,7 +74,7 @@ func (s *CompileCommandsDetector) Scan(projectRoot string, verbose bool) ([]*inv
 
 	for _, ccPath := range discovered {
 		if verbose {
-			fmt.Printf("  [compile_commands] Parsing %s\n", ccPath)
+			fmt.Printf("  [%s] Parsing %s\n", DetectorCompileCommands, ccPath)
 		}
 		data, err := os.ReadFile(ccPath)
 		if err != nil {

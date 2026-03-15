@@ -1,10 +1,41 @@
 package probers
 
 import (
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 )
+
+// SkipDirs lists directory names that all probers should skip when
+// walking a project tree.  Individual detectors may add extras via
+// WalkProject's extraSkip parameter.
+var SkipDirs = map[string]bool{
+	"node_modules": true,
+	"vendor":       true,
+}
+
+// WalkProject walks root, skipping directories whose names start with
+// "." or ".git", any directory in SkipDirs, and any name in extraSkip.
+// visitFile is called for every regular file entry that passes the
+// directory filter.
+func WalkProject(root string, extraSkip map[string]bool, visitFile func(path string, d os.DirEntry)) {
+	_ = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			name := d.Name()
+			if strings.HasPrefix(name, ".") || strings.HasPrefix(name, ".git") ||
+				SkipDirs[name] || extraSkip[name] {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		visitFile(path, d)
+		return nil
+	})
+}
 
 // resolveIncPath resolves path against baseDir when path is relative and
 // baseDir is non-empty.  This is needed for compile_commands.json where each

@@ -13,7 +13,7 @@ import (
 
 type VcpkgDetector struct{}
 
-func (s *VcpkgDetector) Name() string { return "vcpkg" }
+func (s *VcpkgDetector) Name() string { return string(DetectorVcpkg) }
 
 type vcpkgDependency struct {
 	Name    string `json:"name"`
@@ -29,39 +29,28 @@ type vcpkgLock struct {
 func (s *VcpkgDetector) Scan(projectRoot string, verbose bool) ([]*inventory.Component, error) {
 	var components []*inventory.Component
 
-	_ = filepath.WalkDir(projectRoot, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return nil
-		}
-		if d.IsDir() {
-			if strings.HasPrefix(d.Name(), ".git") {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-
+	WalkProject(projectRoot, nil, func(path string, d os.DirEntry) {
 		switch strings.ToLower(d.Name()) {
 		case "vcpkg.json":
 			if verbose {
-				fmt.Printf("  [vcpkg] Parsing vcpkg.json: %s\n", path)
+				fmt.Printf("  [%s] Parsing vcpkg.json: %s\n", DetectorVcpkg, path)
 			}
 			components = append(components, parseVcpkgManifest(path)...)
 
 		case "vcpkg-lock.json":
 			if verbose {
-				fmt.Printf("  [vcpkg] Parsing vcpkg-lock.json: %s\n", path)
+				fmt.Printf("  [%s] Parsing vcpkg-lock.json: %s\n", DetectorVcpkg, path)
 			}
 			components = append(components, parseVcpkgLock(path)...)
 
 		case "status":
 			if strings.Contains(filepath.ToSlash(path), "vcpkg") {
 				if verbose {
-					fmt.Printf("  [vcpkg] Parsing vcpkg status: %s\n", path)
+					fmt.Printf("  [%s] Parsing vcpkg status: %s\n", DetectorVcpkg, path)
 				}
 				components = append(components, parseVcpkgStatus(path)...)
 			}
 		}
-		return nil
 	})
 
 	return components, nil
@@ -183,7 +172,7 @@ func makeVcpkgComponent(name, version string) *inventory.Component {
 		Name:            canonicalName,
 		Version:         version,
 		PURL:            purl,
-		DetectionSource: "vcpkg",
+		DetectionSource: string(DetectorVcpkg),
 		Description:     desc,
 	}
 }

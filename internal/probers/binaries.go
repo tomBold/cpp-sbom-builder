@@ -12,9 +12,11 @@ import (
 	"github.com/tomBold/cpp-sbom-builder/internal/slices"
 )
 
+// no extra dirs to skip beyond the shared set
+
 type BinariesDetector struct{}
 
-func (s *BinariesDetector) Name() string { return "binary-scan" }
+func (s *BinariesDetector) Name() string { return string(DetectorBinaryScan) }
 
 var binaryExts = map[string]bool{
 	".so": true, ".a": true, ".dll": true, ".lib": true, ".dylib": true,
@@ -30,33 +32,21 @@ func (s *BinariesDetector) Scan(projectRoot string, verbose bool) ([]*inventory.
 	seen := map[string]*inventory.Component{}
 	fileCount := 0
 
-	_ = filepath.WalkDir(projectRoot, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return nil
-		}
-		if d.IsDir() {
-			name := d.Name()
-			if strings.HasPrefix(name, ".git") || name == "node_modules" {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-
+	WalkProject(projectRoot, nil, func(path string, d os.DirEntry) {
 		filename := d.Name()
 		ext := strings.ToLower(filepath.Ext(filename))
 		isSOWithVersion := strings.Contains(strings.ToLower(filename), ".so.")
 
 		if !binaryExts[ext] && !isSOWithVersion {
-			return nil
+			return
 		}
 
 		fileCount++
 		detectBinaryComponent(filename, seen)
-		return nil
 	})
 
 	if verbose {
-		fmt.Printf("  [binary-scan] Scanned %d binary artifact(s), found %d components\n", fileCount, len(seen))
+		fmt.Printf("  [%s] Scanned %d binary artifact(s), found %d components\n", DetectorBinaryScan, fileCount, len(seen))
 	}
 
 	result := make([]*inventory.Component, 0, len(seen))
@@ -91,7 +81,7 @@ func detectBinaryComponent(filename string, seen map[string]*inventory.Component
 			Name:            lib.Name,
 			Version:         version,
 			PURL:            purl,
-			DetectionSource: "binary-scan",
+			DetectionSource: string(DetectorBinaryScan),
 			Description:     lib.Description,
 		}
 		if c.Version == "" {

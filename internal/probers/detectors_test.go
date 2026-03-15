@@ -4,30 +4,15 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 
-	"github.com/tomBold/cpp-sbom-builder/internal/inventory"
+	"github.com/tomBold/cpp-sbom-builder/internal/testutil"
 )
-
-func testdataDir() string {
-	_, file, _, _ := runtime.Caller(0)
-	root := filepath.Join(filepath.Dir(file), "..", "..")
-	return filepath.Join(root, "testdata", "fixtures")
-}
-
-func nameSet(comps []*inventory.Component) map[string]bool {
-	m := make(map[string]bool, len(comps))
-	for _, c := range comps {
-		m[c.Name] = true
-	}
-	return m
-}
 
 func TestConanfileTxt_RequiresSection(t *testing.T) {
 	strat := &ConanDetector{}
-	result := strat.ScanWithGraph(testdataDir(), false)
-	byName := nameSet(result.Components)
+	result := strat.ScanWithGraph(testutil.TestdataDir(), false)
+	byName := testutil.NameSet(result.Components)
 	for _, want := range []string{"boost", "openssl", "zlib", "nlohmann_json"} {
 		if !byName[want] {
 			t.Errorf("conanfile.txt: expected %q not found; got %v", want, keys(byName))
@@ -37,8 +22,8 @@ func TestConanfileTxt_RequiresSection(t *testing.T) {
 
 func TestConanfileTxt_BuildRequiresSection(t *testing.T) {
 	strat := &ConanDetector{}
-	result := strat.ScanWithGraph(testdataDir(), false)
-	byName := nameSet(result.Components)
+	result := strat.ScanWithGraph(testutil.TestdataDir(), false)
+	byName := testutil.NameSet(result.Components)
 	for _, want := range []string{"cmake", "ninja"} {
 		if !byName[want] {
 			t.Errorf("conanfile.txt [build_requires]: expected %q not found; got %v", want, keys(byName))
@@ -48,7 +33,7 @@ func TestConanfileTxt_BuildRequiresSection(t *testing.T) {
 
 func TestConanfileTxt_DirectNames(t *testing.T) {
 	strat := &ConanDetector{}
-	result := strat.ScanWithGraph(testdataDir(), false)
+	result := strat.ScanWithGraph(testutil.TestdataDir(), false)
 	for _, want := range []string{"boost", "openssl", "zlib", "nlohmann_json", "cmake", "ninja"} {
 		if !result.DirectNames[want] {
 			t.Errorf("conanfile.txt: %q should be in DirectNames; DirectNames=%v", want, result.DirectNames)
@@ -57,7 +42,7 @@ func TestConanfileTxt_DirectNames(t *testing.T) {
 }
 
 func TestConanfileTxt_ChannelAndRevision(t *testing.T) {
-	txtPath := filepath.Join(testdataDir(), "conanfile.txt")
+	txtPath := filepath.Join(testutil.TestdataDir(), "conanfile.txt")
 	comps, _ := parseConanfileTxtWithDirect(txtPath)
 	for _, c := range comps {
 		if c.Name == "openssl" {
@@ -78,8 +63,8 @@ func TestConanfileTxt_ChannelAndRevision(t *testing.T) {
 
 func TestConanfilePy_ListSyntax(t *testing.T) {
 	strat := &ConanDetector{}
-	result := strat.ScanWithGraph(testdataDir(), false)
-	byName := nameSet(result.Components)
+	result := strat.ScanWithGraph(testutil.TestdataDir(), false)
+	byName := testutil.NameSet(result.Components)
 	for _, want := range []string{"fmt", "spdlog"} {
 		if !byName[want] {
 			t.Errorf("conanfile.py list syntax: expected %q not found; got %v", want, keys(byName))
@@ -89,8 +74,8 @@ func TestConanfilePy_ListSyntax(t *testing.T) {
 
 func TestConanfilePy_PythonRequires(t *testing.T) {
 	strat := &ConanDetector{}
-	result := strat.ScanWithGraph(testdataDir(), false)
-	byName := nameSet(result.Components)
+	result := strat.ScanWithGraph(testutil.TestdataDir(), false)
+	byName := testutil.NameSet(result.Components)
 	if !byName["cmake-conan"] {
 		t.Errorf("conanfile.py python_requires: expected cmake-conan not found; got %v", keys(byName))
 	}
@@ -98,7 +83,7 @@ func TestConanfilePy_PythonRequires(t *testing.T) {
 
 func TestConanfilePy_RevisionInSelfRequires(t *testing.T) {
 	strat := &ConanDetector{}
-	result := strat.ScanWithGraph(testdataDir(), false)
+	result := strat.ScanWithGraph(testutil.TestdataDir(), false)
 	for _, c := range result.Components {
 		if c.Name == "openssl" && c.Revision == "deadbeef1234" {
 			return // found with correct revision
@@ -108,7 +93,7 @@ func TestConanfilePy_RevisionInSelfRequires(t *testing.T) {
 }
 
 func TestConanLockV1_DirectVsTransitive(t *testing.T) {
-	lockPath := filepath.Join(testdataDir(), "conan.lock")
+	lockPath := filepath.Join(testutil.TestdataDir(), "conan.lock")
 	result := parseConanLockWithGraph(lockPath)
 	if !result.DirectNames["boost"] {
 		t.Errorf("boost should be direct; DirectNames=%v", result.DirectNames)
@@ -122,14 +107,14 @@ func TestConanLockV1_DirectVsTransitive(t *testing.T) {
 }
 
 func TestConanLockV1_Edges(t *testing.T) {
-	lockPath := filepath.Join(testdataDir(), "conan.lock")
+	lockPath := filepath.Join(testutil.TestdataDir(), "conan.lock")
 	result := parseConanLockWithGraph(lockPath)
 	assertEdge(t, result.Edges, "boost", "zlib")
 	assertEdge(t, result.Edges, "openssl", "zlib")
 }
 
 func TestConanLockV1_Revision(t *testing.T) {
-	lockPath := filepath.Join(testdataDir(), "conan.lock")
+	lockPath := filepath.Join(testutil.TestdataDir(), "conan.lock")
 	result := parseConanLockWithGraph(lockPath)
 	for _, c := range result.Components {
 		if c.Name == "boost" {
@@ -186,11 +171,11 @@ func TestConanRef_Invalid(t *testing.T) {
 
 func TestHeaderScan_DetectsThirdParty(t *testing.T) {
 	strat := &HeadersDetector{}
-	comps, err := strat.Scan(testdataDir(), false)
+	comps, err := strat.Scan(testutil.TestdataDir(), false)
 	if err != nil {
 		t.Fatalf("Scan failed: %v", err)
 	}
-	byName := nameSet(comps)
+	byName := testutil.NameSet(comps)
 	for _, want := range []string{"boost", "openssl", "nlohmann-json"} {
 		if !byName[want] {
 			t.Errorf("header-scan: expected %q not found; got %v", want, keys(byName))
@@ -200,11 +185,11 @@ func TestHeaderScan_DetectsThirdParty(t *testing.T) {
 
 func TestHeaderScan_IgnoresStdlib(t *testing.T) {
 	strat := &HeadersDetector{}
-	comps, err := strat.Scan(testdataDir(), false)
+	comps, err := strat.Scan(testutil.TestdataDir(), false)
 	if err != nil {
 		t.Fatalf("Scan failed: %v", err)
 	}
-	byName := nameSet(comps)
+	byName := testutil.NameSet(comps)
 	for _, bad := range []string{"vector", "string", "iostream", "algorithm", "cstdint"} {
 		if byName[bad] {
 			t.Errorf("header-scan: stdlib %q should not appear as a dependency", bad)
@@ -214,11 +199,11 @@ func TestHeaderScan_IgnoresStdlib(t *testing.T) {
 
 func TestHeaderScan_IgnoresInternalHeaders(t *testing.T) {
 	strat := &HeadersDetector{}
-	comps, err := strat.Scan(testdataDir(), false)
+	comps, err := strat.Scan(testutil.TestdataDir(), false)
 	if err != nil {
 		t.Fatalf("Scan failed: %v", err)
 	}
-	byName := nameSet(comps)
+	byName := testutil.NameSet(comps)
 	if byName["internal_utils"] {
 		t.Error("internal_utils.h should not be reported as a dependency")
 	}
@@ -226,9 +211,9 @@ func TestHeaderScan_IgnoresInternalHeaders(t *testing.T) {
 
 func TestHeaderScan_DetectionSource(t *testing.T) {
 	strat := &HeadersDetector{}
-	comps, _ := strat.Scan(testdataDir(), false)
+	comps, _ := strat.Scan(testutil.TestdataDir(), false)
 	for _, c := range comps {
-		if c.DetectionSource != "header-scan" {
+		if c.DetectionSource != string(DetectorHeaderScan) {
 			t.Errorf("%q has DetectionSource=%q, want header-scan", c.Name, c.DetectionSource)
 		}
 	}
@@ -236,11 +221,11 @@ func TestHeaderScan_DetectionSource(t *testing.T) {
 
 func TestCompileCommands_DetectsExternalIncludes(t *testing.T) {
 	strat := &CompileCommandsDetector{}
-	comps, err := strat.Scan(testdataDir(), false)
+	comps, err := strat.Scan(testutil.TestdataDir(), false)
 	if err != nil {
 		t.Fatalf("Scan failed: %v", err)
 	}
-	byName := nameSet(comps)
+	byName := testutil.NameSet(comps)
 	for _, want := range []string{"boost", "openssl", "zlib"} {
 		if !byName[want] {
 			t.Errorf("compile_commands: expected %q not found; got %v", want, keys(byName))
@@ -250,7 +235,7 @@ func TestCompileCommands_DetectsExternalIncludes(t *testing.T) {
 
 func TestCompileCommands_ExtractsVersionFromPath(t *testing.T) {
 	strat := &CompileCommandsDetector{}
-	comps, _ := strat.Scan(testdataDir(), false)
+	comps, _ := strat.Scan(testutil.TestdataDir(), false)
 	for _, c := range comps {
 		switch c.Name {
 		case "boost":
@@ -318,7 +303,7 @@ func TestCompileCommands_RelativePathsResolvedAgainstDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Scan failed: %v", err)
 	}
-	byName := nameSet(comps)
+	byName := testutil.NameSet(comps)
 	if !byName["boost"] {
 		t.Errorf("expected boost detected from relative include path; got %v", keys(byName))
 	}
@@ -345,11 +330,11 @@ func TestExtractVersionFromPath(t *testing.T) {
 
 func TestVcpkg_ManifestDetectsDependencies(t *testing.T) {
 	strat := &VcpkgDetector{}
-	comps, err := strat.Scan(testdataDir(), false)
+	comps, err := strat.Scan(testutil.TestdataDir(), false)
 	if err != nil {
 		t.Fatalf("Scan failed: %v", err)
 	}
-	byName := nameSet(comps)
+	byName := testutil.NameSet(comps)
 	for _, want := range []string{"zlib", "libcurl", "sqlite3", "yaml-cpp"} {
 		if !byName[want] {
 			t.Errorf("vcpkg: expected %q not found; got %v", want, keys(byName))
@@ -359,9 +344,9 @@ func TestVcpkg_ManifestDetectsDependencies(t *testing.T) {
 
 func TestVcpkg_DetectionSource(t *testing.T) {
 	strat := &VcpkgDetector{}
-	comps, _ := strat.Scan(testdataDir(), false)
+	comps, _ := strat.Scan(testutil.TestdataDir(), false)
 	for _, c := range comps {
-		if c.DetectionSource != "vcpkg" {
+		if c.DetectionSource != string(DetectorVcpkg) {
 			t.Errorf("%q has DetectionSource=%q, want vcpkg", c.Name, c.DetectionSource)
 		}
 	}
@@ -369,11 +354,11 @@ func TestVcpkg_DetectionSource(t *testing.T) {
 
 func TestCMake_FindPackageAndFetchContent(t *testing.T) {
 	strat := &CMakeDetector{}
-	comps, err := strat.Scan(testdataDir(), false)
+	comps, err := strat.Scan(testutil.TestdataDir(), false)
 	if err != nil {
 		t.Fatalf("Scan failed: %v", err)
 	}
-	byName := nameSet(comps)
+	byName := testutil.NameSet(comps)
 	for _, want := range []string{"openssl", "boost", "fmt"} {
 		if !byName[want] {
 			t.Errorf("cmake: expected %q not found; got %v", want, keys(byName))
@@ -383,9 +368,9 @@ func TestCMake_FindPackageAndFetchContent(t *testing.T) {
 
 func TestCMake_DetectionSource(t *testing.T) {
 	strat := &CMakeDetector{}
-	comps, _ := strat.Scan(testdataDir(), false)
+	comps, _ := strat.Scan(testutil.TestdataDir(), false)
 	for _, c := range comps {
-		if c.DetectionSource != "cmake" {
+		if c.DetectionSource != string(DetectorCMake) {
 			t.Errorf("%q has DetectionSource=%q, want cmake", c.Name, c.DetectionSource)
 		}
 	}

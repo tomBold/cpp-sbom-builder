@@ -1,6 +1,9 @@
 package collector
 
-import "github.com/tomBold/cpp-sbom-builder/internal/inventory"
+import (
+	"github.com/tomBold/cpp-sbom-builder/internal/inventory"
+	"github.com/tomBold/cpp-sbom-builder/internal/probers"
+)
 
 // sourceInfo describes a single detector's position in the
 // source-priority model.  All per-detector policy lives here;
@@ -18,12 +21,12 @@ type sourceInfo struct {
 // folding, so "first non-empty wins" rules always pick the most
 // trusted value without needing per-rule trust checks.
 var sourceRegistry = map[string]sourceInfo{
-	"conan":                 {Rank: 10, Confidence: 0.97, IsDirect: false},
-	"vcpkg":                 {Rank: 10, Confidence: 0.97, IsDirect: true},
-	"compile_commands.json": {Rank: 8, Confidence: 0.85, IsDirect: true},
-	"cmake":                 {Rank: 6, Confidence: 0.80, IsDirect: true},
-	"binary-scan":           {Rank: 4, Confidence: 0.65, IsDirect: false},
-	"header-scan":           {Rank: 1, Confidence: 0.60, IsDirect: true},
+	string(probers.DetectorConan):           {Rank: 10, Confidence: 0.97, IsDirect: false},
+	string(probers.DetectorVcpkg):           {Rank: 10, Confidence: 0.97, IsDirect: true},
+	string(probers.DetectorCompileCommands): {Rank: 8, Confidence: 0.85, IsDirect: true},
+	string(probers.DetectorCMake):           {Rank: 6, Confidence: 0.80, IsDirect: true},
+	string(probers.DetectorBinaryScan):      {Rank: 4, Confidence: 0.65, IsDirect: false},
+	string(probers.DetectorHeaderScan):      {Rank: 1, Confidence: 0.60, IsDirect: true},
 }
 
 func sourceRank(name string) int {

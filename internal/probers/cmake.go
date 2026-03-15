@@ -15,7 +15,7 @@ import (
 
 type CMakeDetector struct{}
 
-func (s *CMakeDetector) Name() string { return "cmake" }
+func (s *CMakeDetector) Name() string { return string(DetectorCMake) }
 
 var (
 	reFindPackage  = regexp.MustCompile(`(?i)find_package\s*\(\s*([A-Za-z0-9_\-]+)`)
@@ -51,30 +51,19 @@ func (s *CMakeDetector) Scan(projectRoot string, verbose bool) ([]*inventory.Com
 		cf := filepath.Join(projectRoot, rel)
 		if _, err := os.Stat(cf); err == nil {
 			if verbose {
-				fmt.Printf("  [cmake] Parsing CMakeCache.txt: %s\n", cf)
+				fmt.Printf("  [%s] Parsing CMakeCache.txt: %s\n", DetectorCMake, cf)
 			}
 			parseCMakeCache(cf, projectRoot, seen, versions)
 		}
 	}
 
-	_ = filepath.WalkDir(projectRoot, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return nil
-		}
-		if d.IsDir() {
-			name := d.Name()
-			if strings.HasPrefix(name, ".git") || name == "node_modules" {
-				return filepath.SkipDir
-			}
-			return nil
-		}
+	WalkProject(projectRoot, nil, func(path string, d os.DirEntry) {
 		if strings.EqualFold(d.Name(), "CMakeLists.txt") {
 			if verbose {
-				fmt.Printf("  [cmake] Parsing CMakeLists.txt: %s\n", path)
+				fmt.Printf("  [%s] Parsing CMakeLists.txt: %s\n", DetectorCMake, path)
 			}
 			parseCMakeLists(path, seen, versions)
 		}
-		return nil
 	})
 
 	for name, c := range seen {
@@ -129,7 +118,7 @@ func parseCMakeCache(path, projectRoot string, seen map[string]*inventory.Compon
 				entry = registry.Identify(dirPath)
 			}
 			if entry != nil {
-				upsertComponent(seen, entry, dirPath, "", "cmake")
+				upsertComponent(seen, entry, dirPath, "", string(DetectorCMake))
 			}
 		}
 
@@ -143,7 +132,7 @@ func parseCMakeCache(path, projectRoot string, seen map[string]*inventory.Compon
 				entry = registry.Identify(libPath)
 			}
 			if entry != nil {
-				upsertComponent(seen, entry, "", filepath.Base(libPath), "cmake")
+				upsertComponent(seen, entry, "", filepath.Base(libPath), string(DetectorCMake))
 			}
 		}
 	}
@@ -182,7 +171,7 @@ func parseCMakeLists(path string, seen map[string]*inventory.Component, versions
 				Description: "Detected via CMake find_package()",
 			}
 		}
-		upsertComponent(seen, entry, "", "", "cmake")
+		upsertComponent(seen, entry, "", "", string(DetectorCMake))
 	}
 
 	fetchMatches := reFetchContent.FindAllStringSubmatchIndex(content, -1)
@@ -203,7 +192,7 @@ func parseCMakeLists(path string, seen map[string]*inventory.Component, versions
 		if tm := reGitTag.FindStringSubmatch(content[loc[1]:end]); tm != nil {
 			versions[strings.ToLower(pkgName)] = strings.TrimPrefix(tm[1], "v")
 		}
-		upsertComponent(seen, entry, "", "", "cmake")
+		upsertComponent(seen, entry, "", "", string(DetectorCMake))
 	}
 
 	for _, m := range reLibToken.FindAllStringSubmatch(content, -1) {
@@ -212,7 +201,7 @@ func parseCMakeLists(path string, seen map[string]*inventory.Component, versions
 			continue
 		}
 		if entry := registry.Identify(ns); entry != nil {
-			upsertComponent(seen, entry, "", "", "cmake")
+			upsertComponent(seen, entry, "", "", string(DetectorCMake))
 		}
 	}
 }
