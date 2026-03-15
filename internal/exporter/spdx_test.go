@@ -69,8 +69,12 @@ func TestSPDX_MinConfidenceFilter(t *testing.T) {
 	docAll := buildSPDX(result, "test", 0.0)
 	docHigh := buildSPDX(result, "test", 0.85)
 
-	if len(docHigh.Packages) > len(docAll.Packages) {
-		t.Error("higher min-confidence should produce fewer or equal packages")
+	if len(docAll.Packages) == 0 {
+		t.Fatal("unfiltered SPDX doc has no packages")
+	}
+	if len(docHigh.Packages) >= len(docAll.Packages) {
+		t.Errorf("expected filtering at 0.85 to remove low-confidence packages: all=%d high=%d",
+			len(docAll.Packages), len(docHigh.Packages))
 	}
 }
 

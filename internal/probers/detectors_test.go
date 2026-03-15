@@ -236,15 +236,22 @@ func TestCompileCommands_DetectsExternalIncludes(t *testing.T) {
 func TestCompileCommands_ExtractsVersionFromPath(t *testing.T) {
 	strat := &CompileCommandsDetector{}
 	comps, _ := strat.Scan(testutil.TestdataDir(), false)
+	byName := testutil.NameSet(comps)
+	if !byName["boost"] {
+		t.Fatal("expected boost to be detected")
+	}
+	if !byName["zlib"] {
+		t.Fatal("expected zlib to be detected")
+	}
 	for _, c := range comps {
 		switch c.Name {
 		case "boost":
 			if c.Version != "1.82.0" {
-				t.Errorf("boost version = %q, want 1.82.0 (from path boost_1_82_0)", c.Version)
+				t.Errorf("boost version = %q, want 1.82.0", c.Version)
 			}
 		case "zlib":
 			if c.Version != "1.2.13" {
-				t.Errorf("zlib version = %q, want 1.2.13 (from path zlib-1.2.13)", c.Version)
+				t.Errorf("zlib version = %q, want 1.2.13", c.Version)
 			}
 		}
 	}

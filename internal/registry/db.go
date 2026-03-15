@@ -3,10 +3,10 @@ package registry
 import "strings"
 
 type KnownLib struct {
-	Name        string   // canonical name used throughout the SBOM (e.g. "boost")
-	PathHints   []string // substrings found in paths that indicate this library
-	IncludePats []string // characteristic header file names / path prefixes
-	PURLPrefix  string   // Package URL base without version (e.g. "pkg:conan/boost")
+	Name        string
+	PathHints   []string
+	IncludePats []string
+	PURLPrefix  string
 	Description string
 }
 

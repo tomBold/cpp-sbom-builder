@@ -1,0 +1,191 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "version": 1,
+  "serialNumber": "urn:uuid:a325cf14-1e61-489d-8f14-1e61a325cf14",
+  "metadata": {
+    "timestamp": "2026-03-15T20:40:32Z",
+    "tools": [
+      {
+        "vendor": "tomBold",
+        "name": "cpp-sbom-builder",
+        "version": "1.0.0"
+      }
+    ],
+    "component": {
+      "type": "application",
+      "name": "demo"
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "bom-ref": "pkg:conan/abseil",
+      "name": "abseil",
+      "description": "Abseil C++ Common Libraries",
+      "purl": "pkg:conan/abseil",
+      "properties": [
+        {
+          "name": "sbom:dependencyType",
+          "value": "direct"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:conan/boost@1.82.0",
+      "name": "boost",
+      "version": "1.82.0",
+      "description": "Boost C++ Libraries",
+      "purl": "pkg:conan/boost@1.82.0",
+      "properties": [
+        {
+          "name": "sbom:dependencyType",
+          "value": "direct"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:conan/cmake@3.27.0",
+      "name": "cmake",
+      "version": "3.27.0",
+      "purl": "pkg:conan/cmake@3.27.0",
+      "properties": [
+        {
+          "name": "sbom:dependencyType",
+          "value": "direct"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:conan/fmt@10.2.1",
+      "name": "fmt",
+      "version": "10.2.1",
+      "description": "{fmt} formatting library",
+      "purl": "pkg:conan/fmt@10.2.1",
+      "properties": [
+        {
+          "name": "sbom:dependencyType",
+          "value": "direct"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:conan/grpc",
+      "name": "grpc",
+      "description": "gRPC remote procedure call framework",
+      "purl": "pkg:conan/grpc",
+      "properties": [
+        {
+          "name": "sbom:dependencyType",
+          "value": "direct"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:conan/libcurl",
+      "name": "libcurl",
+      "description": "libcurl — the multiprotocol file transfer library",
+      "purl": "pkg:conan/libcurl",
+      "properties": [
+        {
+          "name": "sbom:dependencyType",
+          "value": "direct"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:github/nlohmann/json@3.11.2",
+      "name": "nlohmann_json",
+      "version": "3.11.2",
+      "description": "JSON for Modern C++",
+      "purl": "pkg:github/nlohmann/json@3.11.2",
+      "properties": [
+        {
+          "name": "sbom:dependencyType",
+          "value": "direct"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:conan/openssl@3.1.4?channel=conan%2Fstable",
+      "name": "openssl",
+      "version": "3.1.4",
+      "description": "OpenSSL cryptography library",
+      "purl": "pkg:conan/openssl@3.1.4?channel=conan%2Fstable",
+      "properties": [
+        {
+          "name": "sbom:dependencyType",
+          "value": "direct"
+        },
+        {
+          "name": "sbom:channel",
+          "value": "conan/stable"
+        },
+        {
+          "name": "sbom:linkLibraries",
+          "value": "libssl.so.3.1.4"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:conan/spdlog@1.12.0",
+      "name": "spdlog",
+      "version": "1.12.0",
+      "description": "Fast C++ logging library",
+      "purl": "pkg:conan/spdlog@1.12.0",
+      "properties": [
+        {
+          "name": "sbom:dependencyType",
+          "value": "direct"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:conan/sqlite3",
+      "name": "sqlite3",
+      "description": "SQLite embedded database",
+      "purl": "pkg:conan/sqlite3",
+      "properties": [
+        {
+          "name": "sbom:dependencyType",
+          "value": "direct"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:conan/yaml-cpp",
+      "name": "yaml-cpp",
+      "description": "yaml-cpp YAML parser",
+      "purl": "pkg:conan/yaml-cpp",
+      "properties": [
+        {
+          "name": "sbom:dependencyType",
+          "value": "direct"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:conan/zlib",
+      "name": "zlib",
+      "description": "zlib compression library",
+      "purl": "pkg:conan/zlib",
+      "properties": [
+        {
+          "name": "sbom:dependencyType",
+          "value": "direct"
+        }
+      ]
+    }
+  ]
+}

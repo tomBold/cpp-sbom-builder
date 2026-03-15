@@ -12,8 +12,6 @@ import (
 	"github.com/tomBold/cpp-sbom-builder/internal/slices"
 )
 
-// no extra dirs to skip beyond the shared set
-
 type BinariesDetector struct{}
 
 func (s *BinariesDetector) Name() string { return string(DetectorBinaryScan) }
@@ -141,9 +139,4 @@ func isVersionLike(s string) bool {
 		}
 	}
 	return true
-}
-
-func BinaryStubForTesting(dir, soname string) error {
-	path := filepath.Join(dir, soname)
-	return os.WriteFile(path, []byte("stub"), 0644)
 }

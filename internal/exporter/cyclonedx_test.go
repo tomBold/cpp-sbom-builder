@@ -80,8 +80,12 @@ func TestCycloneDX_MinConfidenceFilter(t *testing.T) {
 	bomAll := buildCycloneDX(result, "test", 0.0)
 	bomHigh := buildCycloneDX(result, "test", 0.85)
 
-	if len(bomHigh.Components) > len(bomAll.Components) {
-		t.Error("higher min-confidence should produce fewer or equal components")
+	if len(bomAll.Components) == 0 {
+		t.Fatal("unfiltered BOM has no components")
+	}
+	if len(bomHigh.Components) >= len(bomAll.Components) {
+		t.Errorf("expected filtering at 0.85 to remove low-confidence components: all=%d high=%d",
+			len(bomAll.Components), len(bomHigh.Components))
 	}
 }
 

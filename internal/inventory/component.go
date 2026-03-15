@@ -3,18 +3,18 @@ package inventory
 import "strings"
 
 type Component struct {
-	Name            string   // Canonical library name (e.g. "boost", "openssl")
-	Version         string   // Detected version string, or "unknown"
-	PURL            string   // Package URL (e.g. pkg:conan/boost@1.82.0)
-	Revision        string   // Conan recipe revision hash (#abc123), if known
-	Channel         string   // Conan user/channel (e.g. "conan/stable"), if known
-	DetectionSource string   // Highest-confidence strategy that detected this
-	Description     string   // Human-readable description from fingerprint DB
-	IncludePaths    []string // External include paths that led to detection
-	LinkLibraries   []string // Linked library names (e.g. "boost_system", "ssl")
+	Name            string
+	Version         string
+	PURL            string
+	Revision        string // Conan recipe revision hash, if known
+	Channel         string // Conan user/channel, if known
+	DetectionSource string
+	Description     string
+	IncludePaths    []string
+	LinkLibraries   []string
 
-	IsDirect     bool     // true = directly used by the project; false = transitive
-	Dependencies []string // Names of child dependencies (populated by graph strategies)
+	IsDirect     bool
+	Dependencies []string
 }
 
 func (c *Component) Key() string {

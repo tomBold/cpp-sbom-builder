@@ -92,12 +92,8 @@ type runResult struct {
 	edges       map[string][]string
 }
 
-// runDetectors executes all detectors concurrently and collects their
-// results into a fixed-position slice keyed by detector registration
-// order.  This guarantees that outputs is always in the same
-// deterministic order regardless of goroutine scheduling, making every
-// downstream consumer (foldOutputs, markDirectTransitive, attachEdges)
-// reproducible without relying on secondary sorts.
+// runDetectors executes all detectors concurrently, collecting results
+// into a fixed-position slice keyed by registration order for determinism.
 func (e *Engine) runDetectors() runResult {
 	outputs := make([]detectorOutput, len(e.detectors))
 	var wg sync.WaitGroup
@@ -142,9 +138,6 @@ func (e *Engine) runDetectors() runResult {
 func (e *Engine) foldOutputs(r runResult) (components []*inventory.Component, fired, quiet []string) {
 	merged := make(map[string]*inventory.Component)
 
-	// Process outputs in trust-level order (highest first) so that
-	// "first wins" merge rules always pick the most-trusted value.
-	// Secondary sort by name for full determinism.
 	ordered := make([]detectorOutput, len(r.outputs))
 	copy(ordered, r.outputs)
 	sort.Slice(ordered, func(i, j int) bool {

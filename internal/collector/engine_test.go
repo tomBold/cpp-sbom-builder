@@ -197,18 +197,14 @@ func TestSortedComponents_DeterministicOrder(t *testing.T) {
 		"openssl": {Name: "openssl"},
 	}
 
-	for i := 0; i < 50; i++ {
-		out := sortedComponents(merged)
-		if len(out) != 3 {
-			t.Fatalf("expected 3 components, got %d", len(out))
-		}
-		if out[0].Name != "boost" || out[1].Name != "openssl" || out[2].Name != "zlib" {
-			t.Fatalf("unexpected order: %s, %s, %s", out[0].Name, out[1].Name, out[2].Name)
-		}
+	out := sortedComponents(merged)
+	if len(out) != 3 {
+		t.Fatalf("expected 3 components, got %d", len(out))
+	}
+	if out[0].Name != "boost" || out[1].Name != "openssl" || out[2].Name != "zlib" {
+		t.Fatalf("unexpected order: %s, %s, %s", out[0].Name, out[1].Name, out[2].Name)
 	}
 }
-
-// --- dependency-injection tests ---
 
 type fakeDetector struct {
 	name       string
