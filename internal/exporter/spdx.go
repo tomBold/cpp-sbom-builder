@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/tomBold/cpp-sbom-builder/internal/collector"
+	"github.com/tomBold/cpp-sbom-builder/internal/inventory"
 )
 
 type spdxDoc struct {
@@ -70,10 +72,16 @@ func buildSPDX(result *collector.ScanResult, toolVersion string, minConfidence f
 	sorted := collector.FilterByConfidence(result.Components, minConfidence)
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Name < sorted[j].Name })
 
+	spdxIDByName := make(map[string]string, len(sorted))
+
 	pkgs := make([]spdxPackage, 0, len(sorted))
 	for i, c := range sorted {
+		spdxID := fmt.Sprintf("SPDXRef-pkg-%d", i+1)
+		spdxIDByName[strings.ToLower(c.Name)] = spdxID
+		spdxIDByName[inventory.NormalizeKey(c.Name)] = spdxID
+
 		pkg := spdxPackage{
-			SPDXID:           fmt.Sprintf("SPDXRef-pkg-%d", i+1),
+			SPDXID:           spdxID,
 			Name:             c.Name,
 			VersionInfo:      c.Version,
 			FilesAnalyzed:    false,
@@ -99,6 +107,27 @@ func buildSPDX(result *collector.ScanResult, toolVersion string, minConfidence f
 			Type:    "DESCRIBES",
 			Related: pkg.SPDXID,
 		})
+	}
+
+	for _, c := range sorted {
+		if len(c.Dependencies) == 0 {
+			continue
+		}
+		parentID := spdxIDByName[strings.ToLower(c.Name)]
+		var childIDs []string
+		for _, childName := range c.Dependencies {
+			if childID, ok := spdxIDByName[inventory.NormalizeKey(childName)]; ok {
+				childIDs = append(childIDs, childID)
+			}
+		}
+		sort.Strings(childIDs)
+		for _, childID := range childIDs {
+			rels = append(rels, spdxRelationship{
+				Element: parentID,
+				Type:    "DEPENDS_ON",
+				Related: childID,
+			})
+		}
 	}
 
 	docName := result.ProjectName

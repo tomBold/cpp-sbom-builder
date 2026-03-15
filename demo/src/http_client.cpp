@@ -17,6 +17,9 @@
 // Detected: libcurl
 #include <curl/curl.h>
 
+// Detected: pugixml (header-only, no manifest entry — tests confidence filtering)
+#include <pugixml.hpp>
+
 void fetchURL(const std::string& url) {
     // Initialise gRPC channel
     grpc_init();

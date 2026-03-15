@@ -2,9 +2,9 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "version": 1,
-  "serialNumber": "urn:uuid:a325cf14-1e61-489d-8f14-1e61a325cf14",
+  "serialNumber": "urn:uuid:d66da598-1fa3-489d-a598-1fa3d66da598",
   "metadata": {
-    "timestamp": "2026-03-15T20:40:32Z",
+    "timestamp": "2026-03-15T21:03:36Z",
     "tools": [
       {
         "vendor": "tomBold",
@@ -136,6 +136,19 @@
     },
     {
       "type": "library",
+      "bom-ref": "pkg:conan/pugixml",
+      "name": "pugixml",
+      "description": "pugixml XML parser",
+      "purl": "pkg:conan/pugixml",
+      "properties": [
+        {
+          "name": "sbom:dependencyType",
+          "value": "direct"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "bom-ref": "pkg:conan/spdlog@1.12.0",
       "name": "spdlog",
       "version": "1.12.0",
@@ -176,15 +189,36 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:conan/zlib",
+      "bom-ref": "pkg:conan/zlib@1.2.13",
       "name": "zlib",
+      "version": "1.2.13",
       "description": "zlib compression library",
-      "purl": "pkg:conan/zlib",
+      "purl": "pkg:conan/zlib@1.2.13",
       "properties": [
         {
           "name": "sbom:dependencyType",
           "value": "direct"
         }
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "pkg:conan/boost@1.82.0",
+      "dependsOn": [
+        "pkg:conan/zlib@1.2.13"
+      ]
+    },
+    {
+      "ref": "pkg:conan/openssl@3.1.4?channel=conan%2Fstable",
+      "dependsOn": [
+        "pkg:conan/zlib@1.2.13"
+      ]
+    },
+    {
+      "ref": "pkg:conan/spdlog@1.12.0",
+      "dependsOn": [
+        "pkg:conan/fmt@10.2.1"
       ]
     }
   ]

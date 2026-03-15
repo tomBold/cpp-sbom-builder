@@ -105,7 +105,7 @@ Pre-generated sample SBOMs from scanning the `demo/` project are in the `samples
 - [`samples/demo-cyclonedx.json`](samples/demo-cyclonedx.json) -- CycloneDX 1.5
 - [`samples/demo-spdx.json`](samples/demo-spdx.json) -- SPDX 2.3
 
-Both contain 12 detected components (boost, openssl, zlib, fmt, spdlog, grpc, libcurl, nlohmann_json, sqlite3, yaml-cpp, abseil, cmake) with versions, PURLs, and dependency metadata.
+Both contain 13 detected components (boost, openssl, zlib, fmt, spdlog, grpc, libcurl, nlohmann_json, sqlite3, yaml-cpp, abseil, cmake, pugixml) with versions, PURLs, dependency graph edges, and metadata.
 
 ---
 

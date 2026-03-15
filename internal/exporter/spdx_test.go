@@ -87,3 +87,32 @@ func TestSPDX_ConsistentWithCycloneDX(t *testing.T) {
 		t.Errorf("CycloneDX has %d components, SPDX has %d packages (should match)", len(cdxBom.Components), len(spdxDoc.Packages))
 	}
 }
+
+func TestSPDX_DependsOnRelationships(t *testing.T) {
+	result := mustScan(t)
+	doc := buildSPDX(result, "test", 0)
+
+	hasDependsOn := false
+	for _, rel := range doc.Relationships {
+		if rel.Type == "DEPENDS_ON" {
+			hasDependsOn = true
+			if rel.Element == "SPDXRef-DOCUMENT" {
+				t.Error("DEPENDS_ON should not originate from SPDXRef-DOCUMENT")
+			}
+			if rel.Related == "" {
+				t.Error("DEPENDS_ON has empty relatedSpdxElement")
+			}
+		}
+	}
+
+	hasDeps := false
+	for _, c := range result.Components {
+		if len(c.Dependencies) > 0 {
+			hasDeps = true
+			break
+		}
+	}
+	if hasDeps && !hasDependsOn {
+		t.Error("scan result has dependency edges but SPDX doc has no DEPENDS_ON relationships")
+	}
+}

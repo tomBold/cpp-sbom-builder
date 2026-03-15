@@ -1,0 +1,273 @@
+{
+  "spdxVersion": "SPDX-2.3",
+  "dataLicense": "CC0-1.0",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "name": "demo",
+  "documentNamespace": "https://spdx.org/spdxdocs/demo-urn:uuid:06b6cea4-1fa5-489d-8ea4-1fa506b6cea4",
+  "creationInfo": {
+    "created": "2026-03-15T21:03:41Z",
+    "creators": [
+      "Tool: cpp-sbom-builder-1.0.0"
+    ]
+  },
+  "packages": [
+    {
+      "SPDXID": "SPDXRef-pkg-1",
+      "name": "abseil",
+      "filesAnalyzed": false,
+      "downloadLocation": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:conan/abseil"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-pkg-2",
+      "name": "boost",
+      "versionInfo": "1.82.0",
+      "filesAnalyzed": false,
+      "downloadLocation": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:conan/boost@1.82.0"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-pkg-3",
+      "name": "cmake",
+      "versionInfo": "3.27.0",
+      "filesAnalyzed": false,
+      "downloadLocation": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:conan/cmake@3.27.0"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-pkg-4",
+      "name": "fmt",
+      "versionInfo": "10.2.1",
+      "filesAnalyzed": false,
+      "downloadLocation": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:conan/fmt@10.2.1"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-pkg-5",
+      "name": "grpc",
+      "filesAnalyzed": false,
+      "downloadLocation": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:conan/grpc"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-pkg-6",
+      "name": "libcurl",
+      "filesAnalyzed": false,
+      "downloadLocation": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:conan/libcurl"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-pkg-7",
+      "name": "nlohmann_json",
+      "versionInfo": "3.11.2",
+      "filesAnalyzed": false,
+      "downloadLocation": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:github/nlohmann/json@3.11.2"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-pkg-8",
+      "name": "openssl",
+      "versionInfo": "3.1.4",
+      "filesAnalyzed": false,
+      "downloadLocation": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:conan/openssl@3.1.4?channel=conan%2Fstable"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-pkg-9",
+      "name": "pugixml",
+      "filesAnalyzed": false,
+      "downloadLocation": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:conan/pugixml"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-pkg-10",
+      "name": "spdlog",
+      "versionInfo": "1.12.0",
+      "filesAnalyzed": false,
+      "downloadLocation": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:conan/spdlog@1.12.0"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-pkg-11",
+      "name": "sqlite3",
+      "filesAnalyzed": false,
+      "downloadLocation": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:conan/sqlite3"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-pkg-12",
+      "name": "yaml-cpp",
+      "filesAnalyzed": false,
+      "downloadLocation": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:conan/yaml-cpp"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-pkg-13",
+      "name": "zlib",
+      "versionInfo": "1.2.13",
+      "filesAnalyzed": false,
+      "downloadLocation": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:conan/zlib@1.2.13"
+        }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-pkg-1"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-pkg-2"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-pkg-3"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-pkg-4"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-pkg-5"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-pkg-6"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-pkg-7"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-pkg-8"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-pkg-9"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-pkg-10"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-pkg-11"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-pkg-12"
+    },
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-pkg-13"
+    },
+    {
+      "spdxElementId": "SPDXRef-pkg-2",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-pkg-13"
+    },
+    {
+      "spdxElementId": "SPDXRef-pkg-8",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-pkg-13"
+    },
+    {
+      "spdxElementId": "SPDXRef-pkg-10",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-pkg-4"
+    }
+  ]
+}
