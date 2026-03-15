@@ -1,6 +1,6 @@
 # cpp-sbom-builder
 
-[![CI](https://github.com/tomBold/cpp-sbom-builder/actions/workflows/ci.yml/badge.svg)](https://github.com/tomBold/cpp-sbom-builder/actions/workflows/ci.yml)
+[![Tests](https://github.com/tomBold/cpp-sbom-builder/actions/workflows/ci.yml/badge.svg)](https://github.com/tomBold/cpp-sbom-builder/actions/workflows/ci.yml)
 
 A Software Bill of Materials (SBOM) generation engine for C++ projects.
 Point it at a project folder and get a **CycloneDX 1.5** or **SPDX 2.3** JSON listing all detected third-party dependencies.
